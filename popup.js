@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", function () {
         );
     });
 
-    // Table button: scrape all tables, add to array, and immediately download as JSON
+    // Table button: map columns to course, assignment, and due date using header keywords, and if due date is empty, scan all cells for a date-like value
     tableButton.addEventListener("click", () => {
         if (!currentUrl) {
             alert("Could not retrieve the current website.");
@@ -47,34 +47,64 @@ document.addEventListener("DOMContentLoaded", function () {
                 {
                     target: { tabId: tabs[0].id },
                     func: () => {
-                        return Array.from(document.querySelectorAll('table')).map(table =>
-                            Array.from(table.rows).map(row =>
+                        function getColumnIndex(headers, keywords) {
+                            for (let i = 0; i < headers.length; i++) {
+                                const header = headers[i].toLowerCase();
+                                for (const keyword of keywords) {
+                                    if (header.includes(keyword)) return i;
+                                }
+                            }
+                            return -1;
+                        }
+                        function looksLikeAnyDate(str) {
+                            if (!str) return false;
+                            str = str.trim().toLowerCase();
+                            // Match month names, MM/DD, MM/DD/YYYY, YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, etc.
+                            return /(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*|\b\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b|\b\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2}:\d{2})?\b/.test(str);
+                        }
+                        return Array.from(document.querySelectorAll('table')).map(table => {
+                            const rows = Array.from(table.rows).map(row =>
                                 Array.from(row.cells).map(cell => cell.innerText.trim())
-                            )
-                        );
+                            );
+                            if (rows.length < 2) return null;
+                            const headers = rows[0];
+                            const courseIdx = getColumnIndex(headers, ['course', 'class', 'section']);
+                            const assignmentIdx = getColumnIndex(headers, ['assignment', 'name', 'title', 'problem', 'exam', 'details']);
+                            const dueIdx = getColumnIndex(headers, ['due', 'date', 'deadline', 'submission']);
+                            return rows.slice(1).map(row => {
+                                let due_date = dueIdx !== -1 && row[dueIdx] ? row[dueIdx] : '';
+                                if (!due_date) {
+                                    // Scan all cells for a date-like value
+                                    for (const cell of row) {
+                                        if (looksLikeAnyDate(cell)) {
+                                            due_date = cell;
+                                            break;
+                                        }
+                                    }
+                                }
+                                return {
+                                    course: courseIdx !== -1 && row[courseIdx] ? row[courseIdx] : '',
+                                    assignment: assignmentIdx !== -1 && row[assignmentIdx] ? row[assignmentIdx] : '',
+                                    due_date: due_date
+                                };
+                            });
+                        }).filter(Boolean).flat();
                     }
                 },
                 (results) => {
-                    const tables = results && results[0] && results[0].result;
-                    if (tables && tables.length) {
+                    const items = results && results[0] && results[0].result;
+                    if (items && items.length) {
                         // Display as HTML in popup
-                        let html = '';
-                        tables.forEach(table => {
-                            html += '<table border="1" style="margin-bottom:10px;">';
-                            table.forEach(row => {
-                                html += '<tr>';
-                                row.forEach(cell => {
-                                    html += `<td>${cell}</td>`;
-                                });
-                                html += '</tr>';
-                            });
-                            html += '</table>';
+                        let html = '<table border="1" style="margin-bottom:10px;"><tr><th>Course</th><th>Assignment</th><th>Due Date</th></tr>';
+                        items.forEach(item => {
+                            html += `<tr><td>${item.course}</td><td>${item.assignment}</td><td>${item.due_date}</td></tr>`;
                         });
+                        html += '</table>';
                         websiteDisplay.innerHTML = html;
                         // Immediately download as JSON
-                        downloadJSON(tables);
+                        downloadJSON(items);
                     } else {
-                        alert("No tables found on the page.");
+                        alert("No tables with the required columns found on the page.");
                     }
                 }
             );
