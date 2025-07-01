@@ -1,5 +1,4 @@
 {
-<<<<<<< HEAD
     "name": "UniTion",
     "description": "Organize all your courses assignments from different sources into one place!",
     "version": "0.1.0",
@@ -21,11 +20,12 @@
     ],
     "web_accessible_resources": [
         {
-            "resources": ["data.json"],
+            "resources": ["data.json", "assignment.json"],
             "matches": ["<all_urls>"]
         }
     ],
     "permissions": [
+        "identity",
         "storage",
         "scripting",
         "tabs",
@@ -35,52 +35,13 @@
         "http://*/*",
         "https://*/*/",
         "https://us.prairielearn.com/pl",
-        "https://api.notion.com/*"
-=======
-  "name": "UniTion",
-  "description": "Organize all your courses assignments from different sources into one place!",
-  "version": "0.1.0",
-  "manifest_version": 3,
-  "action": {
-    "default_popup": "index.html",
-    "default_icon": "./assets/pixel_pom.png"
-  },
-  "background": {
-    "service_worker": "background.js",
-    "type": "module"
-  },
-  "permissions": [
-    "identity",
-    "storage",
-    "scripting",
-    "tabs",
-    "activeTab"
-  ],
-  "host_permissions": [
-    "http://*/*",
-    "https://*/*/",
-    "https://us.prairielearn.com/pl",
-    "https://api.notion.com/*",
-    "https://www.googleapis.com/*"
-  ],
-  "oauth2": {
-    "client_id": "515809074342-g9npvkf7gqron8kkfd3q3sqe8agiq73f.apps.googleusercontent.com",
-    "scopes": [
-      "https://www.googleapis.com/auth/calendar.events"
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
-    ]
-  },
-  "content_scripts": [
-    {
-      "matches": ["https://www.notion.so/*"],
-      "js": ["contentScript.js"],
-      "css": ["overlay.css"]
+        "https://api.notion.com/*",
+        "https://www.googleapis.com/*"
+    ],
+    "oauth2": {
+        "client_id": "515809074342-g9npvkf7gqron8kkfd3q3sqe8agiq73f.apps.googleusercontent.com",
+        "scopes": [
+            "https://www.googleapis.com/auth/calendar.events"
+        ]
     }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["assignment.json", "data.json"],
-      "matches": ["<all_urls>"]
-    }
-  ]
 }
