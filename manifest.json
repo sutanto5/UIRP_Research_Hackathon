@@ -8,16 +8,32 @@
         "default_icon": "./assets/pixel_pom.png"
     },
     "background": {
+        "service_worker": "background.js",
         "type": "module"
     },
+    "content_scripts": [
+        {
+            "matches": ["https://www.notion.so/*"],
+            "js": ["contentScript.js"],
+            "css": ["overlay.css"]
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["data.json"],
+            "matches": ["<all_urls>"]
+        }
+    ],
     "permissions": [
         "storage",
         "scripting",
-        "tabs"
+        "tabs",
+        "activeTab"
     ],
     "host_permissions": [
         "http://*/*",
         "https://*/*/",
-        "https://us.prairielearn.com/pl"
+        "https://us.prairielearn.com/pl",
+        "https://api.notion.com/*"
     ]
 }
