@@ -1,17 +1,26 @@
+/* Custom font */
+@font-face {
+    font-family: 'MyFont';
+    src: url('./assets/BrainWants-ODYe.ttf');
+    font-weight: normal;
+    font-style: normal;
+}
+
 /* General */
 body {
-    background-color: #f6f9da;
-    font-family: 'Arial', sans-serif;
+    background-image: linear-gradient(white, skyblue);
+    font-family: 'MyFont', sans-serif;
+    font-size: 15px;
     text-align: center;
     padding: 20px;
-    width: 500px;
-    height: 500px;
+    min-width: 300px;
+    min-height: 350px;
     overflow: hidden; /* prevents resizing due to content changes */
 }
 
 /* Title */
 h1 {
-    font-family: 'Georgia', serif;
+    font-family: 'MyFont', serif;
     color: #333;
 }
 
@@ -29,21 +38,21 @@ h1 {
 }
 
 button {
-    font-family: 'Courier New', monospace;
+    font-family: 'MyFont', monospace;
     font-size: 16px;
-    background-color: #4CAF50;
+    background-color: #8b48bc;
     color: white;
     padding: 10px 20px;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     width:130px; 
-    /* margin: 5px; */
+    margin: 5px;
     transition: background-color 0.3s ease;
 }
 
 button:hover {
-    background-color: #45a049;
+    background-color: #502171;
 }
 
 /* smooth fade effect */
@@ -77,4 +86,19 @@ button:hover {
 
 #bgButton:hover {
     background-color: #45a049;
+}
+
+#websiteDisplay {
+    max-width: 250px; /* or 100% depending on container */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0 auto 12px auto;
+    display: block;
+}
+
+.website-input {
+    overflow-x: hidden;
+    word-wrap: break-word; /* optional if using multiline layout */
+    padding: 0 10px;
 }

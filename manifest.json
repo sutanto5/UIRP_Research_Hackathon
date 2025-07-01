@@ -5,17 +5,35 @@
     "manifest_version": 3,
     "action": {
         "default_popup": "index.html",
-        "default_icon": "./images/pixel_pom.png"
+        "default_icon": "./assets/pixel_pom.png"
     },
     "background": {
+        "service_worker": "background.js",
         "type": "module"
     },
+    "content_scripts": [
+        {
+            "matches": ["https://www.notion.so/*"],
+            "js": ["contentScript.js"],
+            "css": ["overlay.css"]
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["data.json"],
+            "matches": ["<all_urls>"]
+        }
+    ],
     "permissions": [
         "storage",
-        "scripting"
+        "scripting",
+        "tabs",
+        "activeTab"
     ],
     "host_permissions": [
         "http://*/*",
-        "https://*/*/"
+        "https://*/*/",
+        "https://us.prairielearn.com/pl",
+        "https://api.notion.com/*"
     ]
 }
