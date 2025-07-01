@@ -1,0 +1,21 @@
+{
+    "name": "UniTion",
+    "description": "Organize all your courses assignments from different sources into one place!",
+    "version": "0.1.0",
+    "manifest_version": 3,
+    "action": {
+        "default_popup": "index.html",
+        "default_icon": "./images/pixel_pom.png"
+    },
+    "background": {
+        "type": "module"
+    },
+    "permissions": [
+        "storage",
+        "scripting"
+    ],
+    "host_permissions": [
+        "http://*/*",
+        "https://*/*/"
+    ]
+}

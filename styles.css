@@ -1,0 +1,80 @@
+/* General */
+body {
+    background-color: #f6f9da;
+    font-family: 'Arial', sans-serif;
+    text-align: center;
+    padding: 20px;
+    width: 500px;
+    height: 500px;
+    overflow: hidden; /* prevents resizing due to content changes */
+}
+
+/* Title */
+h1 {
+    font-family: 'Georgia', serif;
+    color: #333;
+}
+
+/* Happiness Meter*/
+.meter-container {
+    margin-bottom: 15px;
+}
+
+/* Button*/
+.button-container {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+button {
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    width:130px; 
+    /* margin: 5px; */
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+/* smooth fade effect */
+@keyframes fadeInOut {
+    0% { opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+.change-bg-container {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+}
+
+#bgButton {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    font-size: 80px;
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    z-index: 1000;
+}
+
+#bgButton:hover {
+    background-color: #45a049;
+}
