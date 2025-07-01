@@ -15,15 +15,28 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Handle confirm button
     confirmButton.addEventListener("click", () => {
-        if (currentUrl) {
-            console.log("Confirmed URL:", currentUrl);
-            // Replace this with your actual scrape/init logic
-            alert("Fetching assignments from:\n" + currentUrl);
-        } else {
-            alert("Could not retrieve the current website.");
+        if (!currentUrl.includes("prairielearn.com")) {
+            alert("This site is not currently supported.");
+            return;
         }
+
+        // Inject the content script
+        chrome.scripting.executeScript({
+            target: { tabId: currentTabId },
+            files: ["scrapePrairieLearn.js"]
+        });
     });
 
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.type === "PL_ASSIGNMENTS") {
+            const assignments = message.data;
+            console.log("Received assignments:", assignments);
+            alert(`Fetched ${assignments.length} assignments from PrairieLearn.`);
+
+            // You can now pass these to Notion or show them in the UI
+        }
+    });
+ 
     // Background color cycle logic
     const bgColors = ["skyblue", "#f6f9da", "#ffe0b2", "#e1bee7", "#dcedc8", "pink"];
     let currentBgIndex = 0;
