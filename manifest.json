@@ -13,11 +13,13 @@
     "permissions": [
         "storage",
         "scripting",
+        "activeTab",
         "tabs"
     ],
     "host_permissions": [
         "http://*/*",
         "https://*/*/",
         "https://us.prairielearn.com/pl"
+        
     ]
 }
