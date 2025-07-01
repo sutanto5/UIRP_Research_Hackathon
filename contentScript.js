@@ -398,4 +398,8 @@ async function addMultipleAssignments(assignments) {
     }
 }
 
+<<<<<<< HEAD
 // ===== END: Content Script =====
+=======
+// ===== END: Content Script =====
+>>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
