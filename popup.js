@@ -1,45 +1,44 @@
-console.log("This is a popup!")
-
-const DECAY_PER_SECOND = 0.05;
-const MAX_HAPPINESS = 100;
-const MIN_HAPPINESS = 0;
-
 document.addEventListener("DOMContentLoaded", function () {
-    const inputBox = document.getElementById("inputBox");
     const loginButton = document.getElementById("loginButton");
-    const signupButton = document.getElementById("signupButton");
+    const websiteDisplay = document.getElementById("websiteDisplay");
+    const changeBgBtn = document.getElementById("changeBgBtn");
 
-    const now = Date.now();
+    let currentUrl = "";
 
-    // function to log in
-    function logIn() {
+    // Display the current tab's URL
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        const currentTab = tabs[0];
+        currentUrl = currentTab.url;
+        websiteDisplay.textContent = currentUrl;
+        websiteDisplay.title = currentUrl; // hover to see full URL
+    });
 
-    };
+    // Handle confirm button
+    confirmButton.addEventListener("click", () => {
+        if (currentUrl) {
+            console.log("Confirmed URL:", currentUrl);
+            // Replace this with your actual scrape/init logic
+            alert("Fetching assignments from:\n" + currentUrl);
+        } else {
+            alert("Could not retrieve the current website.");
+        }
+    });
 
-    // function to sign up
-    function signUp() {
+    // Background color cycle logic
+    const bgColors = ["skyblue", "#f6f9da", "#ffe0b2", "#e1bee7", "#dcedc8", "pink"];
+    let currentBgIndex = 0;
+    changeBgBtn.addEventListener("click", () => {
+        currentBgIndex = (currentBgIndex + 1) % bgColors.length;
+        const bottomColor = bgColors[currentBgIndex];
+        document.body.style.backgroundImage = `linear-gradient(white, ${bottomColor})`;
+    });
 
-    };
-
-    // listeners for logging in or signing up
+    // Login functionality
     loginButton.addEventListener("click", function () {
         logIn();
     });
 
-    signupButton.addEventListener("click", function () {
-        signUp()
-    });
-
-    const bgColors = ["#f6f9da", "#e3f2fd", "#ffe0b2", "#e1bee7", "#dcedc8"];
-    let currentBgIndex = 0;
-
-    changeBgBtn.addEventListener("click", () => {
-        currentBgIndex = (currentBgIndex + 1) % bgColors.length;
-        document.body.style.backgroundColor = bgColors[currentBgIndex];
-    });
-
-});
-
-window.addEventListener('pagehide', () => {
-    chrome.storage.local.set({ lastClosedTime: Date.now() });
+    function logIn() {
+        alert("Login flow goes here!");
+    }
 });

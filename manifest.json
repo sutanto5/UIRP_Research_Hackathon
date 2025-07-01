@@ -5,17 +5,19 @@
     "manifest_version": 3,
     "action": {
         "default_popup": "index.html",
-        "default_icon": "./images/pixel_pom.png"
+        "default_icon": "./assets/pixel_pom.png"
     },
     "background": {
         "type": "module"
     },
     "permissions": [
         "storage",
-        "scripting"
+        "scripting",
+        "tabs"
     ],
     "host_permissions": [
         "http://*/*",
-        "https://*/*/"
+        "https://*/*/",
+        "https://us.prairielearn.com/pl"
     ]
 }
