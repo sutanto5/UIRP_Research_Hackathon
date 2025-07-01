@@ -3,6 +3,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const websiteDisplay = document.getElementById("websiteDisplay");
     const changeBgBtn = document.getElementById("changeBgBtn");
     const confirmButton = document.getElementById("confirmButton");
+    const tableButton = document.getElementById("tableButton");
+    const addCalendarBtn = document.getElementById("add-calendar");
 
     let currentUrl = "";
 
@@ -17,74 +19,58 @@ document.addEventListener("DOMContentLoaded", function () {
         const isNotionPage = currentUrl && currentUrl.includes('notion.so');
         
         if (isNotionPage) {
-            // Replace with Notion interface
-            showNotionInterface();
-        } else {
-            // Keep original interface
-            showOriginalInterface();
+            // Add Notion functionality to the existing UI
+            addNotionFunctionality();
         }
     });
 
-    function showOriginalInterface() {
-        // Keep the original interface as is - no changes needed
-        console.log("Showing original interface for non-Notion page");
-    }
-
-    function showNotionInterface() {
-        console.log("Showing Notion interface");
+    function addNotionFunctionality() {
+        // Add Notion section after the existing website-input div
+        const websiteInput = document.querySelector('.website-input');
+        const notionSection = document.createElement('div');
+        notionSection.style.cssText = `
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            border: 2px solid #8b48bc;
+        `;
         
-        // Replace the entire body content with Notion interface
-        document.body.innerHTML = `
-            <h1>UniTion</h1>
-            <p><i>Unifying Your Assignments Into Notion.</i></p>
-
-            <div class="change-bg-container">
-                <button id="changeBgBtn"> 🔄 🖼️</button>
+        notionSection.innerHTML = `
+            <h4 style="margin: 0 0 10px 0; color: #333; font-family: 'MyFont', serif;">📚 Notion Assignment Management</h4>
+            
+            <div style="margin-bottom: 10px; padding: 8px; border-radius: 4px; background: #d4edda; border: 1px solid #c3e6cb;">
+                <small style="color: #155724; font-family: 'MyFont', sans-serif;">✅ Notion Connected</small>
             </div>
-
-            <div style="margin-top: 20px; padding: 15px; background: rgba(255, 255, 255, 0.9); border-radius: 8px; border: 2px solid #8b48bc;">
-                <h4 style="margin: 0 0 10px 0; color: #333; font-family: 'MyFont', serif;">📚 Notion Assignment Management</h4>
+            
+            <button id="createDatabaseBtn" style="width: 100%; margin-bottom: 8px;">Create Assignment Database</button>
+            
+            <div style="margin-top: 15px; padding: 15px; background: rgba(139, 72, 188, 0.1); border-radius: 8px; border: 1px solid #8b48bc;">
+                <h5 style="margin: 0 0 10px 0; color: #333; font-family: 'MyFont', serif;">📋 ECE220 Assignments</h5>
+                <button id="viewAssignmentsBtn" style="width: 100%; margin-bottom: 10px;">View ECE220 Assignments</button>
                 
-                <div style="margin-bottom: 10px; padding: 8px; border-radius: 4px; background: #d4edda; border: 1px solid #c3e6cb;">
-                    <small style="color: #155724; font-family: 'MyFont', sans-serif;">✅ Notion Connected</small>
-                </div>
-                
-                <button id="createDatabaseBtn" style="width: 100%; margin-bottom: 8px;">Create Assignment Database</button>
-                
-                <div style="margin-top: 15px; padding: 15px; background: rgba(139, 72, 188, 0.1); border-radius: 8px; border: 1px solid #8b48bc;">
-                    <h5 style="margin: 0 0 10px 0; color: #333; font-family: 'MyFont', serif;">📋 ECE220 Assignments</h5>
-                    <button id="viewAssignmentsBtn" style="width: 100%; margin-bottom: 10px;">View ECE220 Assignments</button>
-                    
-                    <div id="assignmentsInterface" style="display: none;">
-                        <div style="margin-bottom: 10px;">
-                            <button id="selectAllBtn" style="width: 48%; margin-right: 2%; font-size: 12px;">Select All</button>
-                            <button id="deselectAllBtn" style="width: 48%; margin-left: 2%; font-size: 12px;">Deselect All</button>
-                        </div>
-                        
-                        <div id="assignmentsList" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background: white; margin-bottom: 10px;">
-                            <!-- Assignments will be loaded here -->
-                        </div>
-                        
-                        <button id="addSelectedBtn" style="width: 100%; font-size: 12px;">Add Selected Assignments</button>
+                <div id="assignmentsInterface" style="display: none;">
+                    <div style="margin-bottom: 10px;">
+                        <button id="selectAllBtn" style="width: 48%; margin-right: 2%; font-size: 12px;">Select All</button>
+                        <button id="deselectAllBtn" style="width: 48%; margin-left: 2%; font-size: 12px;">Deselect All</button>
                     </div>
+                    
+                    <div id="assignmentsList" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background: white; margin-bottom: 10px;">
+                        <!-- Assignments will be loaded here -->
+                    </div>
+                    
+                    <button id="addSelectedBtn" style="width: 100%; font-size: 12px;">Add Selected Assignments</button>
                 </div>
             </div>
         `;
+        
+        websiteInput.parentNode.insertBefore(notionSection, websiteInput.nextSibling);
 
-        // Add event listeners for the new elements
+        // Add event listeners for Notion functionality
         setupNotionEventListeners();
     }
 
     function setupNotionEventListeners() {
-        // Background color cycle logic (preserved from original)
-        const bgColors = ["skyblue", "#f6f9da", "#ffe0b2", "#e1bee7", "#dcedc8", "pink"];
-        let currentBgIndex = 0;
-        document.getElementById('changeBgBtn').addEventListener('click', () => {
-            currentBgIndex = (currentBgIndex + 1) % bgColors.length;
-            const bottomColor = bgColors[currentBgIndex];
-            document.body.style.backgroundImage = `linear-gradient(white, ${bottomColor})`;
-        });
-
         // Create Database button
         document.getElementById('createDatabaseBtn').addEventListener('click', () => {
             console.log("Create Database button clicked!");
@@ -261,7 +247,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }, 3000);
     }
 
-    // Original functionality (for non-Notion pages)
+    // Original functionality (preserved exactly as in original repo)
     // Handle confirm button
     confirmButton.addEventListener("click", () => {
         if (currentUrl) {
@@ -289,5 +275,32 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function logIn() {
         alert("Login flow goes here!");
+    }
+
+    // Table button functionality (if it exists)
+    if (tableButton) {
+        tableButton.addEventListener("click", () => {
+            if (!currentUrl) {
+                alert("Could not retrieve the current website.");
+                return;
+            }
+            // Add table scraping functionality here
+            alert("Table scraping functionality would go here!");
+        });
+    }
+
+    // Calendar button functionality (if it exists)
+    if (addCalendarBtn) {
+        addCalendarBtn.addEventListener("click", async () => {
+            try {
+                const res = await fetch(chrome.runtime.getURL("assignment.json"));
+                const assignments = await res.json();
+                console.log("✅ Loaded assignments:", assignments);
+                // Add calendar functionality here
+                alert("Calendar functionality would go here!");
+            } catch (err) {
+                console.error("❌ Failed to load assignments:", err);
+            }
+        });
     }
 });
