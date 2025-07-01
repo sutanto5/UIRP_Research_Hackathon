@@ -8,17 +8,20 @@
 </head>
 <body>
     <h1>UniTion</h1>
+    <p><i>Unifying Your Assignments Into Notion.</i></p>
+
     <div class="change-bg-container">
-        <button id="changeBgBtn"> 🔄🖼️</button>
+        <button id="changeBgBtn"> 🔄 🖼️</button>
     </div>
+
+    <button id="loginButton">Notion Login</button>
 
     <div class="website-input">
-        <label for="website">Course Website:</label>
-        <input type="text" id="website" name="website"><br><br>
+        <p>Do you want to grab courses from this website?</p>
+        <p id="websiteDisplay" title="Loading..." style="font-weight: bold; color: #4a148c;">Loading current site...</p>
+        <button id="confirmButton">Confirm</button>
     </div>
 
-    <button id="loginButton">Log In</button>
-    <button id="signupButton">Sign Up</button>
 
     <script type="module" src="popup.js"></script>
 </body>
