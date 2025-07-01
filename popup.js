@@ -1,45 +1,79 @@
-console.log("This is a popup!")
-
-const DECAY_PER_SECOND = 0.05;
-const MAX_HAPPINESS = 100;
-const MIN_HAPPINESS = 0;
-
-document.addEventListener("DOMContentLoaded", function () {
-    const inputBox = document.getElementById("inputBox");
-    const loginButton = document.getElementById("loginButton");
-    const signupButton = document.getElementById("signupButton");
-
-    const now = Date.now();
-
-    // function to log in
-    function logIn() {
-
-    };
-
-    // function to sign up
-    function signUp() {
-
-    };
-
-    // listeners for logging in or signing up
-    loginButton.addEventListener("click", function () {
-        logIn();
+// Request from background
+function getGoogleAuthToken() {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ type: "getAuthToken" }, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+      } else if (response.error) {
+        reject(new Error(response.error));
+      } else {
+        resolve(response.token);
+      }
     });
+  });
+}
 
-    signupButton.addEventListener("click", function () {
-        signUp()
-    });
+//adding to calander
+async function addToCalendar(assignments) {
+  const token = await getGoogleAuthToken();
 
-    const bgColors = ["#f6f9da", "#e3f2fd", "#ffe0b2", "#e1bee7", "#dcedc8"];
-    let currentBgIndex = 0;
+  for (const item of assignments) {
+    try {
+      const response = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          summary: `${item.course}: ${item.assignment}`,
+          description: "Imported from course website",
+          start: {
+            dateTime: item.due,
+            timeZone: "America/Chicago"
+          },
+          end: {
+            dateTime: item.due,
+            timeZone: "America/Chicago"
+          },
+          reminders: { useDefault: true }
+        })
+      });
 
-    changeBgBtn.addEventListener("click", () => {
-        currentBgIndex = (currentBgIndex + 1) % bgColors.length;
-        document.body.style.backgroundColor = bgColors[currentBgIndex];
-    });
+      const result = await response.json();
 
+      if (response.ok) {
+        console.log("Event created:", result.summary);
+      } else {
+        console.error("Failed to create event:", result);
+      }
+    } catch (err) {
+      console.error("Error adding to calendar:", err);
+    }
+  }
+}
+//pressing button
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("add-calendar");
+
+  if (!btn) {
+    console.error("❌ Button not found");
+    return;
+  }
+
+  btn.addEventListener("click", async () => {
+    try {
+      // Load assignments from local JSON
+      const res = await fetch(chrome.runtime.getURL("assignment.json"));
+      const assignments = await res.json();
+
+      console.log("✅ Loaded assignments:", assignments);
+
+      // Add to calendar
+      await addToCalendar(assignments);
+    } catch (err) {
+      console.error("❌ Failed to load or add to calendar:", err);
+    }
+  });
 });
 
-window.addEventListener('pagehide', () => {
-    chrome.storage.local.set({ lastClosedTime: Date.now() });
-});

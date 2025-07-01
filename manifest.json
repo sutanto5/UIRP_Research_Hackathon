@@ -1,21 +1,28 @@
 {
-    "name": "UniTion",
-    "description": "Organize all your courses assignments from different sources into one place!",
-    "version": "0.1.0",
-    "manifest_version": 3,
-    "action": {
-        "default_popup": "index.html",
-        "default_icon": "./images/pixel_pom.png"
-    },
-    "background": {
-        "type": "module"
-    },
-    "permissions": [
-        "storage",
-        "scripting"
-    ],
-    "host_permissions": [
-        "http://*/*",
-        "https://*/*/"
-    ]
+  "name": "UniTion",
+  "description": "Organize all your courses assignments from different sources into one place!",
+  "version": "0.1.0",
+  "manifest_version": 3,
+  "action": {
+    "default_popup": "index.html"
+  },
+  "permissions": [
+    "identity",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "515809074342-g9npvkf7gqron8kkfd3q3sqe8agiq73f.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/calendar.events"]
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [{
+    "resources": ["assignment.json"],
+    "matches": ["<all_urls>"]
+  }]
 }
