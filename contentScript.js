@@ -421,6 +421,10 @@ function extractAssignmentFromRow(cells) {
         let points = '';
         let className = '';
         let url = '';
+        let assignmentType = 'Assignment';
+        let difficulty = 'Intermediate';
+        let estimatedHours = 4;
+        let description = '';
         
         // Try to identify assignment title (usually first column or contains keywords)
         for (let i = 0; i < cellTexts.length; i++) {
@@ -429,6 +433,30 @@ function extractAssignmentFromRow(cells) {
                 text.includes('lab') || text.includes('quiz') || text.includes('exam') ||
                 text.includes('mp') || text.includes('machine problem')) {
                 title = cellTexts[i];
+                description = cellTexts[i];
+                
+                // Determine assignment type
+                if (text.includes('mp') || text.includes('machine problem')) {
+                    assignmentType = 'Machine Problem';
+                    difficulty = 'Advanced';
+                    estimatedHours = 8;
+                } else if (text.includes('lab')) {
+                    assignmentType = 'Laboratory';
+                    difficulty = 'Intermediate';
+                    estimatedHours = 4;
+                } else if (text.includes('homework')) {
+                    assignmentType = 'Homework';
+                    difficulty = 'Intermediate';
+                    estimatedHours = 5;
+                } else if (text.includes('exam')) {
+                    assignmentType = 'Exam';
+                    difficulty = 'Advanced';
+                    estimatedHours = 2;
+                } else if (text.includes('project')) {
+                    assignmentType = 'Project';
+                    difficulty = 'Advanced';
+                    estimatedHours = 12;
+                }
                 break;
             }
         }
@@ -436,13 +464,15 @@ function extractAssignmentFromRow(cells) {
         // If no clear title found, use first non-empty cell
         if (!title) {
             title = cellTexts.find(text => text.length > 0) || 'Untitled Assignment';
+            description = title;
         }
         
         // Look for due date (contains date patterns)
         for (const text of cellTexts) {
             if (text.match(/\d{1,2}\/\d{1,2}\/\d{2,4}/) || 
                 text.match(/\d{1,2}-\d{1,2}-\d{2,4}/) ||
-                text.match(/\w+ \d{1,2},? \d{4}/)) {
+                text.match(/\w+ \d{1,2},? \d{4}/) ||
+                text.match(/\d{1,2}\/\d{1,2}/)) {
                 dueDate = text;
                 break;
             }
@@ -464,20 +494,35 @@ function extractAssignmentFromRow(cells) {
         
         // Try to determine class name from page context
         const pageTitle = document.title.toLowerCase();
-        if (pageTitle.includes('ece220') || pageTitle.includes('ece 220')) {
+        const pageUrl = window.location.href.toLowerCase();
+        
+        if (pageTitle.includes('ece220') || pageTitle.includes('ece 220') || pageUrl.includes('ece220')) {
             className = 'ECE220';
+        } else if (pageTitle.includes('phy220') || pageTitle.includes('phy 220') || pageUrl.includes('phy220')) {
+            className = 'PHY220';
+        } else if (pageTitle.includes('phy221') || pageTitle.includes('phy 221') || pageUrl.includes('phy221')) {
+            className = 'PHY221';
         } else if (pageTitle.includes('cs') || pageTitle.includes('computer science')) {
             className = 'CS';
         } else {
             className = 'General';
         }
         
+        // Enhanced assignment object with all fields
         const assignment = {
             title: title,
+            assignment: title,
             dueDate: dueDate,
+            due_date: dueDate,
             points: points || 'N/A',
             className: className,
-            url: url
+            course: className,
+            url: url,
+            assignment_type: assignmentType,
+            description: description,
+            difficulty: difficulty,
+            estimated_hours: estimatedHours,
+            status: 'Not Started'
         };
         
         console.log("Extracted assignment:", assignment);

@@ -25,8 +25,160 @@ document.addEventListener("DOMContentLoaded", function () {
             if (confirmButton) {
                 confirmButton.remove();
             }
+            
+            // Set up enhanced table scraping functionality
+            setupEnhancedTableScraping();
         }
     });
+
+    // Enhanced table scraping functionality from test_popup.js
+    function setupEnhancedTableScraping() {
+        // Handle confirm button: grab selected text on page
+        if (confirmButton) {
+            confirmButton.addEventListener("click", () => {
+                if (!currentUrl) {
+                    alert("Could not retrieve the current website.");
+                    return;
+                }
+                chrome.scripting.executeScript(
+                    {
+                        target: { tabId: chrome.tabs.TAB_ID_CURRENT },
+                        func: () => window.getSelection().toString(),
+                    },
+                    (results) => {
+                        const phrase = results && results[0] && results[0].result ? results[0].result.trim() : '';
+                        if (phrase) {
+                            websiteDisplay.textContent = phrase;
+                        } else {
+                            alert("No phrase selected on the page.");
+                        }
+                    }
+                );
+            });
+        }
+
+        // Enhanced table button: map columns to course, assignment, and due date using header keywords
+        if (tableButton) {
+            tableButton.addEventListener("click", () => {
+                if (!currentUrl) {
+                    alert("Could not retrieve the current website.");
+                    return;
+                }
+                chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+                    chrome.scripting.executeScript(
+                        {
+                            target: { tabId: tabs[0].id },
+                            func: () => {
+                                function getColumnIndex(headers, keywords) {
+                                    for (let i = 0; i < headers.length; i++) {
+                                        const header = headers[i].toLowerCase();
+                                        for (const keyword of keywords) {
+                                            if (header.includes(keyword)) return i;
+                                        }
+                                    }
+                                    return -1;
+                                }
+                                function looksLikeAnyDate(str) {
+                                    if (!str) return false;
+                                    str = str.trim().toLowerCase();
+                                    // Match month names, MM/DD, MM/DD/YYYY, YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, etc.
+                                    return /(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*|\b\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b|\b\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2}:\d{2})?\b/.test(str);
+                                }
+                                return Array.from(document.querySelectorAll('table')).map(table => {
+                                    const rows = Array.from(table.rows).map(row =>
+                                        Array.from(row.cells).map(cell => cell.innerText.trim())
+                                    );
+                                    if (rows.length < 2) return null;
+                                    const headers = rows[0];
+                                    const courseIdx = getColumnIndex(headers, ['course', 'class', 'section']);
+                                    const assignmentIdx = getColumnIndex(headers, ['assignment', 'name', 'title', 'problem', 'exam', 'details', 'machine_problem']);
+                                    const dueIdx = getColumnIndex(headers, ['due', 'date', 'deadline', 'submission', 'due_date']);
+                                    const pointsIdx = getColumnIndex(headers, ['points', 'pts', 'score', 'weight']);
+                                    const urlIdx = getColumnIndex(headers, ['url', 'link', 'href']);
+                                    
+                                    return rows.slice(1).map(row => {
+                                        let due_date = dueIdx !== -1 && row[dueIdx] ? row[dueIdx] : '';
+                                        if (!due_date) {
+                                            // Scan all cells for a date-like value
+                                            for (const cell of row) {
+                                                if (looksLikeAnyDate(cell)) {
+                                                    due_date = cell;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Enhanced assignment object with more fields
+                                        const assignment = {
+                                            course: courseIdx !== -1 && row[courseIdx] ? row[courseIdx] : '',
+                                            assignment: assignmentIdx !== -1 && row[assignmentIdx] ? row[assignmentIdx] : '',
+                                            title: assignmentIdx !== -1 && row[assignmentIdx] ? row[assignmentIdx] : '',
+                                            due_date: due_date,
+                                            dueDate: due_date,
+                                            points: pointsIdx !== -1 && row[pointsIdx] ? row[pointsIdx] : 'N/A',
+                                            url: urlIdx !== -1 && row[urlIdx] ? row[urlIdx] : '',
+                                            className: courseIdx !== -1 && row[courseIdx] ? row[courseIdx] : 'General',
+                                            assignment_type: 'Assignment',
+                                            description: assignmentIdx !== -1 && row[assignmentIdx] ? row[assignmentIdx] : '',
+                                            difficulty: 'Intermediate',
+                                            estimated_hours: 4,
+                                            status: 'Not Started'
+                                        };
+                                        
+                                        return assignment;
+                                    });
+                                }).filter(Boolean).flat();
+                            }
+                        },
+                        (results) => {
+                            const items = results && results[0] && results[0].result;
+                            if (items && items.length) {
+                                // Store scraped assignments globally
+                                scrapedAssignments = items;
+                                
+                                // Display as HTML in popup
+                                let html = '<table border="1" style="margin-bottom:10px; width:100%; font-size:12px;"><tr><th>Course</th><th>Assignment</th><th>Due Date</th><th>Points</th></tr>';
+                                items.forEach(item => {
+                                    html += `<tr><td>${item.course}</td><td>${item.assignment}</td><td>${item.due_date}</td><td>${item.points}</td></tr>`;
+                                });
+                                html += '</table>';
+                                websiteDisplay.innerHTML = html;
+                                
+                                // Show success message
+                                showMessage(`Successfully scraped ${items.length} assignments!`, 'success');
+                                
+                                // Immediately download as JSON
+                                downloadJSON(items);
+                            } else {
+                                alert("No tables with the required columns found on the page.");
+                            }
+                        }
+                    );
+                });
+            });
+        }
+    }
+
+    // Download JSON functionality from test_popup.js
+    function downloadJSON(data, filename = "scraped_assignments.json") {
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // Background color cycle logic from test_popup.js
+    const bgColors = ["skyblue", "#f6f9da", "#ffe0b2", "#e1bee7", "#dcedc8", "pink"];
+    let currentBgIndex = 0;
+    if (changeBgBtn) {
+        changeBgBtn.addEventListener("click", () => {
+            currentBgIndex = (currentBgIndex + 1) % bgColors.length;
+            document.body.style.backgroundImage = `linear-gradient(white, ${bgColors[currentBgIndex]})`;
+        });
+    }
 
     function showNotionInterface() {
         // Clear the existing content
@@ -298,147 +450,111 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Helper function to display assignments
+    // Display assignments in the interface
     function displayAssignments(assignments) {
         const assignmentsList = document.getElementById('assignmentsList');
         assignmentsList.innerHTML = '';
         
-        assignments.forEach((assignment, index) => {
-            const assignmentDiv = document.createElement('div');
-            assignmentDiv.style.cssText = `
-                display: flex;
-                align-items: center;
-                padding: 8px;
-                border-bottom: 1px solid #eee;
-                font-size: 12px;
-                font-family: 'MyFont', sans-serif;
-            `;
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            
-            // Handle different assignment data formats
-            let assignmentData;
-            if (assignment.machine_problem) {
-                // ECE220 format
-                assignmentData = {
-                    title: assignment.machine_problem,
-                    dueDate: assignment.due_date,
-                    points: assignment.points,
-                    className: 'ECE220',
-                    url: assignment.url
-                };
-            } else if (assignment.title) {
-                // Generic format
-                assignmentData = {
-                    title: assignment.title,
-                    dueDate: assignment.dueDate || assignment.due_date,
-                    points: assignment.points,
-                    className: assignment.className || assignment.class_name || 'General',
-                    url: assignment.url
-                };
-            } else {
-                // Fallback
-                assignmentData = {
-                    title: assignment.name || 'Untitled Assignment',
-                    dueDate: assignment.dueDate || assignment.due_date,
-                    points: assignment.points || 'N/A',
-                    className: assignment.className || assignment.class_name || 'General',
-                    url: assignment.url || ''
-                };
+        // Group assignments by class
+        const assignmentsByClass = {};
+        assignments.forEach(assignment => {
+            const className = assignment.className || assignment.course || 'General';
+            if (!assignmentsByClass[className]) {
+                assignmentsByClass[className] = [];
             }
+            assignmentsByClass[className].push(assignment);
+        });
+        
+        // Create interface for each class
+        Object.keys(assignmentsByClass).forEach(className => {
+            const classAssignments = assignmentsByClass[className];
             
-            checkbox.dataset.assignment = JSON.stringify(assignmentData);
-            checkbox.style.marginRight = '8px';
+            // Class header
+            const classHeader = document.createElement('div');
+            classHeader.style.cssText = 'font-weight: bold; margin: 10px 0 5px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;';
+            classHeader.textContent = className;
+            assignmentsList.appendChild(classHeader);
             
-            const assignmentInfo = document.createElement('div');
-            assignmentInfo.style.flex = '1';
-            assignmentInfo.innerHTML = `
-                <div style="font-weight: bold; color: #333;">${assignmentData.title}</div>
-                <div style="color: #666; font-size: 11px;">
-                    Due: ${assignmentData.dueDate || 'No due date'} | Points: ${assignmentData.points} | Class: ${assignmentData.className}
-                </div>
-            `;
-            
-            assignmentDiv.appendChild(checkbox);
-            assignmentDiv.appendChild(assignmentInfo);
-            assignmentsList.appendChild(assignmentDiv);
+            // Assignments for this class
+            classAssignments.forEach(assignment => {
+                const assignmentDiv = document.createElement('div');
+                assignmentDiv.style.cssText = 'margin: 5px 0; padding: 8px; border: 1px solid #eee; border-radius: 4px; background: #f9f9f9;';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.dataset.assignment = JSON.stringify(assignment);
+                checkbox.style.marginRight = '8px';
+                
+                const assignmentInfo = document.createElement('span');
+                assignmentInfo.style.cssText = 'font-size: 12px;';
+                
+                // Enhanced display with more information
+                const title = assignment.title || assignment.assignment || assignment.machine_problem || 'Untitled';
+                const dueDate = assignment.dueDate || assignment.due_date || 'No due date';
+                const points = assignment.points || 'N/A';
+                const type = assignment.assignment_type || 'Assignment';
+                const difficulty = assignment.difficulty || 'Intermediate';
+                const hours = assignment.estimated_hours || 'N/A';
+                
+                assignmentInfo.innerHTML = `
+                    <strong>${title}</strong><br>
+                    <small>Due: ${dueDate} | Points: ${points} | Type: ${type} | Difficulty: ${difficulty} | Est. Hours: ${hours}</small>
+                `;
+                
+                assignmentDiv.appendChild(checkbox);
+                assignmentDiv.appendChild(assignmentInfo);
+                assignmentsList.appendChild(assignmentDiv);
+            });
         });
     }
 
-    // Helper function to update database status
+    // Update database status
     function updateDatabaseStatus(message) {
-        const statusDiv = document.getElementById('databaseStatus');
-        if (statusDiv) {
-            statusDiv.textContent = message;
-            statusDiv.style.color = message.includes('Error') ? '#dc3545' : '#28a745';
+        const statusElement = document.getElementById('databaseStatus');
+        if (statusElement) {
+            statusElement.textContent = message;
         }
     }
 
-    // Show message helper
+    // Show message function
     function showMessage(message, type) {
-        const messageDiv = document.createElement('div');
-        messageDiv.style.cssText = `
+        // Create a simple toast notification
+        const toast = document.createElement('div');
+        toast.style.cssText = `
             position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-family: 'MyFont', sans-serif;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 5px;
+            color: white;
+            font-size: 14px;
             z-index: 1000;
-            ${type === 'success' ? 'background: #d4edda; color: #155724; border: 1px solid #c3e6cb;' : 
-              type === 'error' ? 'background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;' :
-              'background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb;'}
+            max-width: 300px;
+            word-wrap: break-word;
         `;
-        messageDiv.textContent = message;
-        document.body.appendChild(messageDiv);
         
+        switch (type) {
+            case 'success':
+                toast.style.backgroundColor = '#28a745';
+                break;
+            case 'error':
+                toast.style.backgroundColor = '#dc3545';
+                break;
+            case 'info':
+                toast.style.backgroundColor = '#17a2b8';
+                break;
+            default:
+                toast.style.backgroundColor = '#6c757d';
+        }
+        
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        // Auto-remove after 3 seconds
         setTimeout(() => {
-            if (messageDiv.parentNode) {
-                messageDiv.remove();
+            if (toast.parentNode) {
+                toast.remove();
             }
         }, 3000);
     }
-
-    // Table button functionality - scrape assignments
-    if (tableButton) {
-        tableButton.addEventListener("click", async () => {
-            if (!currentUrl) {
-                alert("Could not retrieve the current website.");
-                return;
-            }
-            
-            try {
-                const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-                const currentTab = tabs[0];
-                
-                const response = await chrome.tabs.sendMessage(currentTab.id, {
-                    type: 'SCRAPE_TABLE_DATA'
-                });
-                
-                if (response && response.success) {
-                    scrapedAssignments = response.assignments || [];
-                    showMessage(`Scraped ${scrapedAssignments.length} assignments!`, 'success');
-                    
-                    // Store the scraped data for use in Notion interface
-                    chrome.storage.local.set({ scrapedAssignments: scrapedAssignments });
-                } else {
-                    showMessage('No table data found or scraping failed', 'error');
-                }
-            } catch (error) {
-                console.error("Error scraping table data:", error);
-                showMessage('Error scraping table data', 'error');
-            }
-        });
-    }
-
-    // Background color cycle logic
-    const bgColors = ["skyblue", "#f6f9da", "#ffe0b2", "#e1bee7", "#dcedc8", "pink"];
-    let currentBgIndex = 0;
-    changeBgBtn.addEventListener("click", () => {
-        currentBgIndex = (currentBgIndex + 1) % bgColors.length;
-        const bottomColor = bgColors[currentBgIndex];
-        document.body.style.backgroundImage = `linear-gradient(white, ${bottomColor})`;
-    });
 });
