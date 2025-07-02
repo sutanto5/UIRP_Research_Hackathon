@@ -555,6 +555,7 @@ async function addMultipleAssignments(assignments) {
     console.log("Current page ID:", pageId);
     
     if (!pageId) {
+        console.error("Could not determine page ID");
         return { success: false, error: 'Could not determine page ID' };
     }
 
@@ -569,7 +570,8 @@ async function addMultipleAssignments(assignments) {
         console.log("Database check result:", dbCheck);
 
         if (!dbCheck.hasDatabase) {
-            return { success: false, error: 'No assignment database found on this page' };
+            console.error("No database found:", dbCheck.error || "No assignment database found");
+            return { success: false, error: dbCheck.error || 'No assignment database found on this page' };
         }
 
         console.log("Found database:", dbCheck.databaseId);
@@ -577,36 +579,52 @@ async function addMultipleAssignments(assignments) {
         // Add each assignment to the database
         let successCount = 0;
         let errorCount = 0;
+        const errors = [];
         
         for (const assignment of assignments) {
             try {
+                console.log(`Adding assignment: ${assignment.title || assignment.assignment}`);
                 const response = await chrome.runtime.sendMessage({
                     type: 'ADD_ASSIGNMENT',
                     databaseId: dbCheck.databaseId,
                     assignment: assignment
                 });
 
+                console.log(`Response for ${assignment.title}:`, response);
+
                 if (response.success) {
                     successCount++;
-                    console.log(`Successfully added: ${assignment.title}`);
+                    console.log(`Successfully added: ${assignment.title || assignment.assignment}`);
                 } else {
                     errorCount++;
-                    console.error(`Failed to add: ${assignment.title} - ${response.error}`);
+                    const errorMsg = response.error || 'Unknown error';
+                    console.error(`Failed to add: ${assignment.title || assignment.assignment} - ${errorMsg}`);
+                    errors.push(`${assignment.title || assignment.assignment}: ${errorMsg}`);
                 }
             } catch (error) {
                 errorCount++;
-                console.error(`Error adding: ${assignment.title}`, error);
+                console.error(`Error adding: ${assignment.title || assignment.assignment}`, error);
+                errors.push(`${assignment.title || assignment.assignment}: ${error.message}`);
             }
         }
 
         console.log(`Results: ${successCount} successful, ${errorCount} failed`);
+        console.log("Errors:", errors);
         
         if (errorCount === 0) {
             return { success: true, message: `Successfully added ${successCount} assignments` };
         } else if (successCount > 0) {
-            return { success: true, message: `Added ${successCount} assignments, ${errorCount} failed` };
+            return { 
+                success: true, 
+                message: `Added ${successCount} assignments, ${errorCount} failed`,
+                errors: errors
+            };
         } else {
-            return { success: false, error: `Failed to add any assignments (${errorCount} errors)` };
+            return { 
+                success: false, 
+                error: `Failed to add any assignments (${errorCount} errors)`,
+                errors: errors
+            };
         }
     } catch (error) {
         console.error("Error in addMultipleAssignments:", error);

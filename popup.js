@@ -369,7 +369,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Add selected assignments to Notion button
         document.getElementById('addSelectedBtn').addEventListener('click', async () => {
+            console.log("=== ADD SELECTED TO NOTION DEBUG ===");
             const checkboxes = document.querySelectorAll('#assignmentsList input[type="checkbox"]:checked');
+            console.log("Checked checkboxes:", checkboxes.length);
+            
             if (checkboxes.length === 0) {
                 showMessage('Please select at least one assignment', 'error');
                 return;
@@ -378,23 +381,34 @@ document.addEventListener("DOMContentLoaded", function () {
             const selectedAssignments = [];
             const selectedCheckboxes = [];
             checkboxes.forEach(checkbox => {
-                const assignmentData = JSON.parse(checkbox.dataset.assignment);
-                selectedAssignments.push(assignmentData);
-                selectedCheckboxes.push(checkbox);
+                try {
+                    const assignmentData = JSON.parse(checkbox.dataset.assignment);
+                    console.log("Parsed assignment data:", assignmentData);
+                    selectedAssignments.push(assignmentData);
+                    selectedCheckboxes.push(checkbox);
+                } catch (error) {
+                    console.error("Error parsing assignment data:", error);
+                    console.log("Raw assignment data:", checkbox.dataset.assignment);
+                }
             });
 
+            console.log("Selected assignments:", selectedAssignments);
             showMessage(`Adding ${selectedAssignments.length} assignments to Notion...`, 'info');
             
             // Get current tab to find the page ID
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
             const currentTab = tabs[0];
+            console.log("Current tab:", currentTab.id, currentTab.url);
             
             // Send message to content script to get page ID and add assignments
             try {
+                console.log("Sending ADD_MULTIPLE_ASSIGNMENTS message to content script...");
                 const response = await chrome.tabs.sendMessage(currentTab.id, {
                     type: 'ADD_MULTIPLE_ASSIGNMENTS',
                     assignments: selectedAssignments
                 });
+                
+                console.log("Response from content script:", response);
                 
                 if (response && response.success) {
                     // Remove successfully added assignments from the list
@@ -407,7 +421,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     
                     showMessage(`Successfully added ${selectedAssignments.length} assignments to Notion!`, 'success');
                 } else {
-                    showMessage(`Failed to add assignments: ${response?.error || 'Unknown error'}`, 'error');
+                    const errorMsg = response?.error || response?.message || 'Unknown error';
+                    console.error("Failed to add assignments:", errorMsg);
+                    showMessage(`Failed to add assignments: ${errorMsg}`, 'error');
                 }
             } catch (error) {
                 console.error("Error adding assignments:", error);

@@ -114,7 +114,9 @@ async function listDatabases() {
             });
 
             if (!response.ok) {
-                return { hasDatabase: false, error: "Failed to search databases" };
+                const errorData = await response.json();
+                console.error("Database search failed:", errorData);
+                return { hasDatabase: false, error: `Failed to search databases: ${errorData.message || response.statusText}` };
             }
 
             const data = await response.json();
@@ -123,24 +125,38 @@ async function listDatabases() {
         } while (cursor);
 
         console.log("Found databases:", databases.length);
+        console.log("Database details:", databases.map(db => ({
+            id: db.id,
+            title: db.title?.[0]?.plain_text || 'Untitled',
+            properties: Object.keys(db.properties || {})
+        })));
         
         // Check if any database has assignment-related properties
         for (const database of databases) {
             const properties = database.properties;
-            if (properties && (
-                properties['Assignment Name'] || 
-                properties['Assignment Title'] || 
-                properties['Title'] || 
-                properties['Done'] ||
-                properties['Class Name'] ||
-                properties['Class'] ||
-                properties['Due Date']
-            )) {
-                return { 
-                    hasDatabase: true, 
-                    databaseId: database.id,
-                    databaseName: database.title?.[0]?.plain_text || 'Untitled'
-                };
+            if (properties) {
+                const propertyNames = Object.keys(properties);
+                console.log(`Database ${database.id} properties:`, propertyNames);
+                
+                // More flexible property matching
+                const hasAssignmentProps = propertyNames.some(name => 
+                    name.toLowerCase().includes('assignment') ||
+                    name.toLowerCase().includes('title') ||
+                    name.toLowerCase().includes('name') ||
+                    name.toLowerCase().includes('due') ||
+                    name.toLowerCase().includes('class') ||
+                    name.toLowerCase().includes('course')
+                );
+                
+                if (hasAssignmentProps) {
+                    console.log(`Found assignment database: ${database.id}`);
+                    return { 
+                        hasDatabase: true, 
+                        databaseId: database.id,
+                        databaseName: database.title?.[0]?.plain_text || 'Untitled',
+                        properties: propertyNames
+                    };
+                }
             }
         }
 
@@ -241,6 +257,52 @@ async function addAssignment(databaseId, assignment) {
         console.log("Adding assignment to database:", databaseId);
         console.log("Assignment data:", assignment);
 
+        // Normalize assignment data
+        const title = assignment.title || assignment.assignment || assignment.machine_problem || 'Untitled Assignment';
+        const className = assignment.className || assignment.course || 'General';
+        const points = assignment.points || assignment.points || 'N/A';
+        const url = assignment.url || '';
+        
+        // Parse due date
+        let dueDate = null;
+        if (assignment.dueDate || assignment.due_date) {
+            const dateStr = assignment.dueDate || assignment.due_date;
+            try {
+                // Handle different date formats
+                let parsedDate;
+                if (dateStr.includes('/')) {
+                    // Handle MM/DD or MM/DD/YYYY format
+                    const parts = dateStr.split('/');
+                    if (parts.length === 2) {
+                        // MM/DD format - assume current year
+                        const year = new Date().getFullYear();
+                        parsedDate = new Date(year, parseInt(parts[0]) - 1, parseInt(parts[1]));
+                    } else if (parts.length === 3) {
+                        // MM/DD/YYYY format
+                        parsedDate = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                    }
+                } else {
+                    // Try direct parsing
+                    parsedDate = new Date(dateStr);
+                }
+                
+                if (!isNaN(parsedDate.getTime())) {
+                    dueDate = parsedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+                }
+            } catch (error) {
+                console.warn("Could not parse date:", dateStr, error);
+            }
+        }
+
+        // Parse points to number
+        let pointsNumber = null;
+        if (points && points !== 'N/A') {
+            const pointsMatch = points.toString().match(/\d+/);
+            if (pointsMatch) {
+                pointsNumber = parseInt(pointsMatch[0]);
+            }
+        }
+
         const response = await fetch('https://api.notion.com/v1/pages', {
             method: 'POST',
             headers: {
@@ -255,24 +317,24 @@ async function addAssignment(databaseId, assignment) {
                         title: [
                             {
                                 type: 'text',
-                                text: { content: assignment.title || 'Untitled Assignment' }
+                                text: { content: title }
                             }
                         ]
                     },
                     'Due Date': {
-                        date: assignment.dueDate ? { start: assignment.dueDate } : null
+                        date: dueDate ? { start: dueDate } : null
                     },
                     'Points': {
-                        number: assignment.points ? parseInt(assignment.points) : null
+                        number: pointsNumber
                     },
                     'Class Name': {
-                        select: { name: assignment.className || 'General' }
+                        select: { name: className }
                     },
                     'Done': {
                         checkbox: false
                     },
                     'URL': {
-                        url: assignment.url || null
+                        url: url || null
                     }
                 }
             })
