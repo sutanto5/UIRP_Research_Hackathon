@@ -1,29 +1,14 @@
-<<<<<<< HEAD
-// ===== NEW: Background Script for Notion Integration =====
-// This script handles Notion API calls and database management using the working assignments.js logic
-=======
 // ===== MERGED BACKGROUND SCRIPT (Notion + Google Auth) =====
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
 
 console.log("=== BACKGROUND SCRIPT LOADING ===");
 console.log("UniTion: Background script loaded");
 
-<<<<<<< HEAD
-// Store for Notion integration token - HARDCODED
-const notionToken = "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";
-
-=======
 // Notion Integration
 const notionToken = "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";
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
 console.log("Notion token loaded:", !!notionToken);
 console.log("Token length:", notionToken.length);
 console.log("Token starts with:", notionToken.substring(0, 10) + "...");
 
-<<<<<<< HEAD
-// Initialize on startup
-=======
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
 chrome.runtime.onStartup.addListener(() => {
     loadStoredData();
 });
@@ -32,40 +17,39 @@ chrome.runtime.onInstalled.addListener(() => {
     loadStoredData();
 });
 
-<<<<<<< HEAD
-// Load stored data from chrome.storage
-async function loadStoredData() {
-    // Store the hardcoded token
-    await chrome.storage.local.set({ notionToken: notionToken });
-    console.log("Stored Notion token in chrome.storage");
-    
-    // Test the token immediately
-=======
 async function loadStoredData() {
     await chrome.storage.local.set({ notionToken: notionToken });
     console.log("Stored Notion token in chrome.storage");
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
     testNotionConnection().then(result => {
         console.log("Initial token test result:", result);
     });
 }
 
-<<<<<<< HEAD
-// Listen for messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log("=== BACKGROUND MESSAGE RECEIVED ===");
     console.log("Message type:", message.type);
     console.log("Message data:", message);
     console.log("Sender:", sender);
     console.log("Current notionToken value:", !!notionToken);
-    
+
+    if (message.type === "getAuthToken") {
+        chrome.identity.getAuthToken({ interactive: true }, (token) => {
+            if (chrome.runtime.lastError) {
+                sendResponse({ error: chrome.runtime.lastError.message });
+            } else {
+                sendResponse({ token });
+            }
+        });
+        return true;
+    }
+
     if (message.type === 'CHECK_DATABASE') {
         console.log("Processing CHECK_DATABASE...");
         listDatabases().then(result => {
             console.log("CHECK_DATABASE result:", result);
             sendResponse(result);
         });
-        return true; // Keep message channel open for async response
+        return true;
     } else if (message.type === 'CREATE_DATABASE') {
         console.log("Processing CREATE_DATABASE...");
         console.log("Page ID:", message.pageId);
@@ -81,30 +65,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             console.log("ADD_ASSIGNMENT result:", result);
             sendResponse(result);
         });
-=======
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log("Received message in background:", message);
-
-    if (message.type === "getAuthToken") {
-        chrome.identity.getAuthToken({ interactive: true }, (token) => {
-            if (chrome.runtime.lastError) {
-                sendResponse({ error: chrome.runtime.lastError.message });
-            } else {
-                sendResponse({ token });
-            }
-        });
-        return true;
-    }
-
-    if (message.type === 'CHECK_DATABASE') {
-        listDatabases().then(result => sendResponse(result));
-        return true;
-    } else if (message.type === 'CREATE_DATABASE') {
-        createAssignmentsDatabase(message.pageId, message.className || 'General').then(result => sendResponse(result));
-        return true;
-    } else if (message.type === 'ADD_ASSIGNMENT') {
-        addAssignment(message.databaseId, message.assignment).then(result => sendResponse(result));
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
         return true;
     } else if (message.type === 'SET_NOTION_TOKEN') {
         handleSetNotionToken(message.token);
@@ -115,19 +75,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         testNotionConnection().then(sendResponse);
         return true;
     } else if (message.type === 'NEW_ASSIGNMENT') {
-<<<<<<< HEAD
-        // Forward assignment data to content script on Notion pages
-=======
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
         forwardAssignmentToNotion(message.data);
         sendResponse({ success: true });
+    } else if (message.type === 'ADD_TO_GOOGLE_CALENDAR') {
+        addToGoogleCalendar(message.assignments).then(sendResponse);
+        return true;
     } else {
         console.error("Unknown message type:", message.type);
         sendResponse({ success: false, error: "Unknown message type" });
     }
 });
 
-<<<<<<< HEAD
 // ===== WORKING LOGIC FROM assignments.js =====
 
 // List all databases (adapted from assignments.js)
@@ -140,12 +98,6 @@ async function listDatabases() {
         let databases = [];
         let cursor = undefined;
         
-=======
-async function listDatabases() {
-    if (!notionToken) return { hasDatabase: false, error: "Notion token not set" };
-    try {
-        let databases = [], cursor = undefined;
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
         do {
             const response = await fetch('https://api.notion.com/v1/search', {
                 method: 'POST',
@@ -154,7 +106,6 @@ async function listDatabases() {
                     'Notion-Version': '2022-06-28',
                     'Content-Type': 'application/json'
                 },
-<<<<<<< HEAD
                 body: JSON.stringify({
                     filter: { property: 'object', value: 'database' },
                     start_cursor: cursor,
@@ -166,17 +117,11 @@ async function listDatabases() {
                 return { hasDatabase: false, error: "Failed to search databases" };
             }
 
-=======
-                body: JSON.stringify({ filter: { property: 'object', value: 'database' }, start_cursor: cursor, page_size: 100 })
-            });
-            if (!response.ok) return { hasDatabase: false, error: "Failed to search databases" };
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
             const data = await response.json();
             databases = databases.concat(data.results);
             cursor = data.has_more ? data.next_cursor : undefined;
         } while (cursor);
 
-<<<<<<< HEAD
         console.log("Found databases:", databases.length);
         
         // Check if any database has assignment-related properties
@@ -199,7 +144,7 @@ async function listDatabases() {
             }
         }
 
-        return { hasDatabase: false };
+        return { hasDatabase: false, databases: databases.length };
     } catch (error) {
         console.error("Error listing databases:", error);
         return { hasDatabase: false, error: error.message };
@@ -207,53 +152,19 @@ async function listDatabases() {
 }
 
 // Create assignments database (adapted from assignments.js)
-async function createAssignmentsDatabase(parentPageId, className) {
-    console.log("=== CREATE ASSIGNMENTS DATABASE DEBUG ===");
-    console.log("Parent page ID:", parentPageId);
-    console.log("Class name:", className);
-    console.log("Notion token available:", !!notionToken);
-    
+async function createAssignmentsDatabase(pageId, className) {
     if (!notionToken) {
-        console.error("Notion token is not set!");
         return { success: false, error: "Notion token not set" };
     }
 
-=======
-        for (const db of databases) {
-            const props = db.properties;
-            if (props && (props['Assignment Name'] || props['Assignment Title'] || props['Title'] || props['Done'] || props['Class Name'] || props['Class'] || props['Due Date'])) {
-                return { hasDatabase: true, databaseId: db.id, databaseName: db.title?.[0]?.plain_text || 'Untitled' };
-            }
-        }
-        return { hasDatabase: false };
-    } catch (err) {
-        console.error("Error listing databases:", err);
-        return { hasDatabase: false, error: err.message };
+    if (!pageId) {
+        return { success: false, error: "Page ID is required" };
     }
-}
 
-async function createAssignmentsDatabase(parentPageId, className) {
-    if (!notionToken) return { success: false, error: "Notion token not set" };
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
     try {
-        const requestBody = {
-            parent: { type: 'page_id', page_id: parentPageId },
-            title: [{ type: 'text', text: { content: `${className} Assignments` } }],
-            properties: {
-                'Assignment Name': { title: {} },
-                'Due Date': { date: {} },
-                'Due Time': { rich_text: {} },
-                'Done': { checkbox: {} },
-                'Class Name': { rich_text: {} },
-                'Details': { rich_text: {} }
-            }
-        };
-<<<<<<< HEAD
-        
-        console.log("Database creation request body:", JSON.stringify(requestBody, null, 2));
+        console.log("Creating database on page:", pageId);
+        console.log("Class name:", className);
 
-=======
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
         const response = await fetch('https://api.notion.com/v1/databases', {
             method: 'POST',
             headers: {
@@ -261,91 +172,75 @@ async function createAssignmentsDatabase(parentPageId, className) {
                 'Notion-Version': '2022-06-28',
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify({
+                parent: { page_id: pageId },
+                title: [
+                    {
+                        type: 'text',
+                        text: { content: `${className} Assignments` }
+                    }
+                ],
+                properties: {
+                    'Assignment Name': {
+                        title: {}
+                    },
+                    'Due Date': {
+                        date: {}
+                    },
+                    'Points': {
+                        number: {}
+                    },
+                    'Class Name': {
+                        select: {
+                            options: [
+                                { name: className, color: 'blue' }
+                            ]
+                        }
+                    },
+                    'Done': {
+                        checkbox: {}
+                    },
+                    'URL': {
+                        url: {}
+                    }
+                }
+            })
         });
-<<<<<<< HEAD
-
-        console.log("Database creation response status:", response.status);
-        console.log("Database creation response headers:", Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
-            const errorData = await response.text();
-            console.error("Database creation API error:", errorData);
-            return { success: false, error: `Failed to create database: ${response.status} ${errorData}` };
+            const errorData = await response.json();
+            console.error("Database creation failed:", errorData);
+            return { success: false, error: `Failed to create database: ${errorData.message || response.statusText}` };
         }
 
         const database = await response.json();
-        console.log("Database created successfully:", database);
-        console.log('Database created! Database ID:', database.id);
-        return { success: true, databaseId: database.id };
+        console.log("Database created successfully:", database.id);
+        
+        return { 
+            success: true, 
+            databaseId: database.id,
+            databaseName: database.title?.[0]?.plain_text || 'Untitled'
+        };
     } catch (error) {
         console.error("Error creating database:", error);
-=======
-        if (!response.ok) {
-            const errorData = await response.text();
-            return { success: false, error: `Failed to create database: ${response.status} ${errorData}` };
-        }
-        const database = await response.json();
-        return { success: true, databaseId: database.id };
-    } catch (error) {
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
         return { success: false, error: error.message };
     }
 }
 
-<<<<<<< HEAD
-// Add assignment (adapted from assignments.js)
+// Add assignment to database (adapted from assignments.js)
 async function addAssignment(databaseId, assignment) {
-    console.log("=== ADD ASSIGNMENT DEBUG ===");
-    console.log("Database ID:", databaseId);
-    console.log("Assignment data:", assignment);
-    console.log("Notion token available:", !!notionToken);
-    
     if (!notionToken) {
-        console.error("Notion token is not set!");
         return { success: false, error: "Notion token not set" };
     }
 
-=======
-async function addAssignment(databaseId, assignment) {
-    if (!notionToken) return { success: false, error: "Notion token not set" };
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
-    try {
-        const requestBody = {
-            parent: { database_id: databaseId },
-            properties: {
-<<<<<<< HEAD
-                'Assignment Name': {
-                    title: [{ text: { content: assignment.title } }]
-                },
-                'Due Date': {
-                    date: { start: assignment.dueDate }
-                },
-                'Due Time': {
-                    rich_text: [{ text: { content: '12:00 PM' } }]
-                },
-                'Done': { checkbox: false },
-                'Class Name': {
-                    rich_text: [{ text: { content: assignment.className } }]
-                },
-                'Details': {
-                    rich_text: [{ text: { content: `Points: ${assignment.points}` } }]
-                }
-            }
-        };
-        
-        console.log("Request body:", JSON.stringify(requestBody, null, 2));
+    if (!databaseId) {
+        return { success: false, error: "Database ID is required" };
+    }
 
-=======
-                'Assignment Name': { title: [{ text: { content: assignment.title } }] },
-                'Due Date': { date: { start: assignment.dueDate } },
-                'Due Time': { rich_text: [{ text: { content: '12:00 PM' } }] },
-                'Done': { checkbox: false },
-                'Class Name': { rich_text: [{ text: { content: assignment.className } }] },
-                'Details': { rich_text: [{ text: { content: `Points: ${assignment.points}` } }] }
-            }
-        };
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
+    try {
+        console.log("Adding assignment to database:", databaseId);
+        console.log("Assignment data:", assignment);
+
         const response = await fetch('https://api.notion.com/v1/pages', {
             method: 'POST',
             headers: {
@@ -353,81 +248,80 @@ async function addAssignment(databaseId, assignment) {
                 'Notion-Version': '2022-06-28',
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify({
+                parent: { database_id: databaseId },
+                properties: {
+                    'Assignment Name': {
+                        title: [
+                            {
+                                type: 'text',
+                                text: { content: assignment.title || 'Untitled Assignment' }
+                            }
+                        ]
+                    },
+                    'Due Date': {
+                        date: assignment.dueDate ? { start: assignment.dueDate } : null
+                    },
+                    'Points': {
+                        number: assignment.points ? parseInt(assignment.points) : null
+                    },
+                    'Class Name': {
+                        select: { name: assignment.className || 'General' }
+                    },
+                    'Done': {
+                        checkbox: false
+                    },
+                    'URL': {
+                        url: assignment.url || null
+                    }
+                }
+            })
         });
-<<<<<<< HEAD
-
-        console.log("Response status:", response.status);
-        console.log("Response headers:", Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
-            const errorData = await response.text();
-            console.error("Notion API error response:", errorData);
-            return { success: false, error: `Failed to add assignment: ${response.status} ${errorData}` };
+            const errorData = await response.json();
+            console.error("Assignment creation failed:", errorData);
+            return { success: false, error: `Failed to create assignment: ${errorData.message || response.statusText}` };
         }
 
-        const result = await response.json();
-        console.log("Success response:", result);
-        console.log('Assignment added!');
-        return { success: true };
+        const page = await response.json();
+        console.log("Assignment created successfully:", page.id);
+        
+        return { success: true, pageId: page.id };
     } catch (error) {
         console.error("Error adding assignment:", error);
-=======
-        if (!response.ok) {
-            const errorData = await response.text();
-            return { success: false, error: `Failed to add assignment: ${response.status} ${errorData}` };
-        }
-        return { success: true };
-    } catch (error) {
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
         return { success: false, error: error.message };
     }
 }
 
-<<<<<<< HEAD
-// ===== END: WORKING LOGIC FROM assignments.js =====
-
-// Forward assignment data to Notion pages
-function forwardAssignmentToNotion(assignmentData) {
-=======
+// Forward assignment data to content script on Notion pages
 function forwardAssignmentToNotion(data) {
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
-    chrome.tabs.query({ url: "https://www.notion.so/*" }, (tabs) => {
-        if (tabs.length > 0) {
-            chrome.tabs.sendMessage(tabs[0].id, {
-                type: 'NEW_ASSIGNMENT',
-<<<<<<< HEAD
-                data: assignmentData
-=======
-                data
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
+    chrome.tabs.query({ url: "*://*.notion.so/*" }, (tabs) => {
+        tabs.forEach(tab => {
+            chrome.tabs.sendMessage(tab.id, {
+                type: 'NEW_ASSIGNMENT_DATA',
+                data: data
+            }).catch(err => {
+                console.log("Could not send to tab:", tab.id, err);
             });
-        }
+        });
     });
 }
 
-<<<<<<< HEAD
-// Handle setting Notion token
 async function handleSetNotionToken(token) {
-    // This function is kept for compatibility but token is hardcoded
-=======
-async function handleSetNotionToken(token) {
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
-    await chrome.storage.local.set({ notionToken: token });
-    console.log("Notion token stored");
+    try {
+        await chrome.storage.local.set({ notionToken: token });
+        console.log("Notion token stored successfully");
+    } catch (error) {
+        console.error("Failed to store Notion token:", error);
+    }
 }
 
-<<<<<<< HEAD
-// Test Notion connection
 async function testNotionConnection() {
     if (!notionToken) {
         return { success: false, error: "No token set" };
     }
 
-=======
-async function testNotionConnection() {
-    if (!notionToken) return { success: false, error: "No token set" };
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
     try {
         const response = await fetch('https://api.notion.com/v1/users/me', {
             headers: {
@@ -435,23 +329,110 @@ async function testNotionConnection() {
                 'Notion-Version': '2022-06-28'
             }
         });
-<<<<<<< HEAD
 
         if (response.ok) {
-            return { success: true };
+            const user = await response.json();
+            return { 
+                success: true, 
+                user: user.name || user.id,
+                message: "Connection successful"
+            };
         } else {
-            return { success: false, error: "Invalid token" };
+            const error = await response.json();
+            return { 
+                success: false, 
+                error: error.message || `HTTP ${response.status}`,
+                details: error
+            };
         }
-=======
-        return response.ok ? { success: true } : { success: false, error: "Invalid token" };
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
     } catch (error) {
-        return { success: false, error: error.message };
+        return { 
+            success: false, 
+            error: error.message || "Network error",
+            details: error
+        };
     }
 }
 
-<<<<<<< HEAD
-// ===== END: Background Script ===== 
-=======
-// ===== END: MERGED BACKGROUND SCRIPT =====
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
+// Add assignments to Google Calendar
+async function addToGoogleCalendar(assignments) {
+    try {
+        console.log("Adding assignments to Google Calendar:", assignments);
+        
+        // Get Google Auth token
+        const authResponse = await new Promise((resolve) => {
+            chrome.identity.getAuthToken({ interactive: true }, (token) => {
+                if (chrome.runtime.lastError) {
+                    resolve({ error: chrome.runtime.lastError.message });
+                } else {
+                    resolve({ token });
+                }
+            });
+        });
+
+        if (authResponse.error) {
+            return { success: false, error: `Google Auth failed: ${authResponse.error}` };
+        }
+
+        const token = authResponse.token;
+        const calendarId = 'primary'; // Use primary calendar
+        
+        // Add each assignment as a calendar event
+        const results = [];
+        for (const assignment of assignments) {
+            try {
+                const event = {
+                    summary: `${assignment.className}: ${assignment.title}`,
+                    description: `Assignment: ${assignment.title}\nPoints: ${assignment.points}\nURL: ${assignment.url || 'N/A'}`,
+                    start: {
+                        dateTime: assignment.dueDate ? new Date(assignment.dueDate).toISOString() : new Date().toISOString(),
+                        timeZone: 'America/Chicago'
+                    },
+                    end: {
+                        dateTime: assignment.dueDate ? new Date(new Date(assignment.dueDate).getTime() + 60 * 60 * 1000).toISOString() : new Date(new Date().getTime() + 60 * 60 * 1000).toISOString(),
+                        timeZone: 'America/Chicago'
+                    },
+                    reminders: {
+                        useDefault: false,
+                        overrides: [
+                            { method: 'email', minutes: 24 * 60 }, // 1 day before
+                            { method: 'popup', minutes: 60 } // 1 hour before
+                        ]
+                    }
+                };
+
+                const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(event)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    results.push({ success: true, assignment: assignment.title, eventId: result.id });
+                } else {
+                    const error = await response.json();
+                    results.push({ success: false, assignment: assignment.title, error: error.error?.message || 'Unknown error' });
+                }
+            } catch (error) {
+                results.push({ success: false, assignment: assignment.title, error: error.message });
+            }
+        }
+
+        const successful = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+
+        return {
+            success: successful > 0,
+            message: `Added ${successful} assignments to Google Calendar${failed > 0 ? `, ${failed} failed` : ''}`,
+            results: results
+        };
+
+    } catch (error) {
+        console.error("Error adding to Google Calendar:", error);
+        return { success: false, error: error.message };
+    }
+}

@@ -297,38 +297,197 @@ function showNotification(message, type) {
     }, 3000);
 }
 
-// Listen for messages from background script
+// Listen for messages from popup and background
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log("Content script received message:", message);
-    
-    if (message.type === 'NEW_ASSIGNMENT') {
-        // Check if current page has a database
-        const pageId = getNotionPageId();
-        if (pageId) {
-            checkForDatabase(pageId).then(result => {
-                if (result.hasDatabase) {
-                    showAssignmentNotification(message.data);
-                } else {
-                    showNoDatabaseNotification();
-                }
-            });
-        }
-        sendResponse({ success: true });
+    console.log("=== CONTENT SCRIPT MESSAGE RECEIVED ===");
+    console.log("Message type:", message.type);
+    console.log("Message data:", message);
+
+    if (message.type === 'CREATE_DATABASE') {
+        console.log("Creating database...");
+        createAssignmentDatabase().then(result => {
+            console.log("CREATE_DATABASE result:", result);
+            sendResponse(result);
+        });
+        return true;
     } else if (message.type === 'ADD_MULTIPLE_ASSIGNMENTS') {
-        // Handle adding multiple assignments
-        addMultipleAssignments(message.assignments).then(sendResponse);
-        return true; // Keep message channel open for async response
-    } else if (message.type === 'CREATE_DATABASE') {
-        // Handle create database request
-        const pageId = getNotionPageId();
-        if (pageId) {
-            createAssignmentDatabase().then(sendResponse);
-            return true; // Keep message channel open for async response
-        } else {
-            sendResponse({ success: false, error: 'Could not determine page ID' });
-        }
+        console.log("Adding multiple assignments...");
+        addMultipleAssignments(message.assignments).then(result => {
+            console.log("ADD_MULTIPLE_ASSIGNMENTS result:", result);
+            sendResponse(result);
+        });
+        return true;
+    } else if (message.type === 'SCRAPE_TABLE_DATA') {
+        console.log("Scraping table data...");
+        scrapeTableData().then(result => {
+            console.log("SCRAPE_TABLE_DATA result:", result);
+            sendResponse(result);
+        });
+        return true;
+    } else if (message.type === 'SCRAPE_ASSIGNMENTS') {
+        console.log("Scraping assignments...");
+        scrapeAssignments().then(result => {
+            console.log("SCRAPE_ASSIGNMENTS result:", result);
+            sendResponse(result);
+        });
+        return true;
+    } else {
+        console.error("Unknown message type:", message.type);
+        sendResponse({ success: false, error: "Unknown message type" });
     }
 });
+
+// Scrape table data from the current page
+async function scrapeTableData() {
+    try {
+        console.log("=== SCRAPING TABLE DATA ===");
+        
+        // Look for common table patterns
+        const tables = document.querySelectorAll('table');
+        console.log("Found tables:", tables.length);
+        
+        if (tables.length === 0) {
+            return { success: false, error: "No tables found on page" };
+        }
+        
+        const assignments = [];
+        
+        // Process each table
+        for (const table of tables) {
+            const rows = table.querySelectorAll('tr');
+            console.log("Table rows:", rows.length);
+            
+            // Skip header row if it exists
+            const dataRows = Array.from(rows).slice(1);
+            
+            for (const row of dataRows) {
+                const cells = row.querySelectorAll('td, th');
+                if (cells.length >= 3) {
+                    // Try to extract assignment data
+                    const assignment = extractAssignmentFromRow(cells);
+                    if (assignment) {
+                        assignments.push(assignment);
+                    }
+                }
+            }
+        }
+        
+        console.log("Scraped assignments:", assignments);
+        
+        if (assignments.length > 0) {
+            // Store the scraped data
+            chrome.storage.local.set({ scrapedAssignments: assignments });
+            return { success: true, assignments: assignments };
+        } else {
+            return { success: false, error: "No assignment data found in tables" };
+        }
+        
+    } catch (error) {
+        console.error("Error scraping table data:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Scrape assignments from the current page (general scraping)
+async function scrapeAssignments() {
+    try {
+        console.log("=== SCRAPING ASSIGNMENTS ===");
+        
+        // First try to get stored scraped data
+        const stored = await chrome.storage.local.get(['scrapedAssignments']);
+        if (stored.scrapedAssignments && stored.scrapedAssignments.length > 0) {
+            console.log("Using stored scraped assignments:", stored.scrapedAssignments);
+            return { success: true, assignments: stored.scrapedAssignments };
+        }
+        
+        // If no stored data, try to scrape from current page
+        return await scrapeTableData();
+        
+    } catch (error) {
+        console.error("Error scraping assignments:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Extract assignment data from a table row
+function extractAssignmentFromRow(cells) {
+    try {
+        const cellTexts = Array.from(cells).map(cell => cell.textContent.trim());
+        console.log("Cell texts:", cellTexts);
+        
+        // Look for common patterns
+        let title = '';
+        let dueDate = '';
+        let points = '';
+        let className = '';
+        let url = '';
+        
+        // Try to identify assignment title (usually first column or contains keywords)
+        for (let i = 0; i < cellTexts.length; i++) {
+            const text = cellTexts[i].toLowerCase();
+            if (text.includes('assignment') || text.includes('homework') || text.includes('project') || 
+                text.includes('lab') || text.includes('quiz') || text.includes('exam') ||
+                text.includes('mp') || text.includes('machine problem')) {
+                title = cellTexts[i];
+                break;
+            }
+        }
+        
+        // If no clear title found, use first non-empty cell
+        if (!title) {
+            title = cellTexts.find(text => text.length > 0) || 'Untitled Assignment';
+        }
+        
+        // Look for due date (contains date patterns)
+        for (const text of cellTexts) {
+            if (text.match(/\d{1,2}\/\d{1,2}\/\d{2,4}/) || 
+                text.match(/\d{1,2}-\d{1,2}-\d{2,4}/) ||
+                text.match(/\w+ \d{1,2},? \d{4}/)) {
+                dueDate = text;
+                break;
+            }
+        }
+        
+        // Look for points (contains numbers)
+        for (const text of cellTexts) {
+            if (text.match(/\d+/) && (text.includes('point') || text.includes('pts') || text.includes('%'))) {
+                points = text;
+                break;
+            }
+        }
+        
+        // Try to get URL from links
+        const links = Array.from(cells).flatMap(cell => cell.querySelectorAll('a'));
+        if (links.length > 0) {
+            url = links[0].href;
+        }
+        
+        // Try to determine class name from page context
+        const pageTitle = document.title.toLowerCase();
+        if (pageTitle.includes('ece220') || pageTitle.includes('ece 220')) {
+            className = 'ECE220';
+        } else if (pageTitle.includes('cs') || pageTitle.includes('computer science')) {
+            className = 'CS';
+        } else {
+            className = 'General';
+        }
+        
+        const assignment = {
+            title: title,
+            dueDate: dueDate,
+            points: points || 'N/A',
+            className: className,
+            url: url
+        };
+        
+        console.log("Extracted assignment:", assignment);
+        return assignment;
+        
+    } catch (error) {
+        console.error("Error extracting assignment from row:", error);
+        return null;
+    }
+}
 
 // Add multiple assignments to database
 async function addMultipleAssignments(assignments) {
@@ -398,8 +557,4 @@ async function addMultipleAssignments(assignments) {
     }
 }
 
-<<<<<<< HEAD
 // ===== END: Content Script =====
-=======
-// ===== END: Content Script =====
->>>>>>> aa5cb3724aae1bab777be26e70b24967c4da3a36
