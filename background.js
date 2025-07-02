@@ -114,7 +114,9 @@ async function listDatabases() {
             });
 
             if (!response.ok) {
-                return { hasDatabase: false, error: "Failed to search databases" };
+                const errorData = await response.json();
+                console.error("Database search failed:", errorData);
+                return { hasDatabase: false, error: `Failed to search databases: ${errorData.message || response.statusText}` };
             }
 
             const data = await response.json();
@@ -123,24 +125,38 @@ async function listDatabases() {
         } while (cursor);
 
         console.log("Found databases:", databases.length);
+        console.log("Database details:", databases.map(db => ({
+            id: db.id,
+            title: db.title?.[0]?.plain_text || 'Untitled',
+            properties: Object.keys(db.properties || {})
+        })));
         
         // Check if any database has assignment-related properties
         for (const database of databases) {
             const properties = database.properties;
-            if (properties && (
-                properties['Assignment Name'] || 
-                properties['Assignment Title'] || 
-                properties['Title'] || 
-                properties['Done'] ||
-                properties['Class Name'] ||
-                properties['Class'] ||
-                properties['Due Date']
-            )) {
-                return { 
-                    hasDatabase: true, 
-                    databaseId: database.id,
-                    databaseName: database.title?.[0]?.plain_text || 'Untitled'
-                };
+            if (properties) {
+                const propertyNames = Object.keys(properties);
+                console.log(`Database ${database.id} properties:`, propertyNames);
+                
+                // More flexible property matching
+                const hasAssignmentProps = propertyNames.some(name => 
+                    name.toLowerCase().includes('assignment') ||
+                    name.toLowerCase().includes('title') ||
+                    name.toLowerCase().includes('name') ||
+                    name.toLowerCase().includes('due') ||
+                    name.toLowerCase().includes('class') ||
+                    name.toLowerCase().includes('course')
+                );
+                
+                if (hasAssignmentProps) {
+                    console.log(`Found assignment database: ${database.id}`);
+                    return { 
+                        hasDatabase: true, 
+                        databaseId: database.id,
+                        databaseName: database.title?.[0]?.plain_text || 'Untitled',
+                        properties: propertyNames
+                    };
+                }
             }
         }
 
@@ -241,6 +257,83 @@ async function addAssignment(databaseId, assignment) {
         console.log("Adding assignment to database:", databaseId);
         console.log("Assignment data:", assignment);
 
+        // Normalize assignment data
+        const title = assignment.title || assignment.assignment || assignment.machine_problem || 'Untitled Assignment';
+        const className = assignment.className || assignment.course || 'General';
+        const points = assignment.points || assignment.points || 'N/A';
+        const url = assignment.url || '';
+        
+        // Parse due date
+        let dueDate = null;
+        if (assignment.dueDate || assignment.due_date) {
+            const dateStr = assignment.dueDate || assignment.due_date;
+            try {
+                // Handle different date formats
+                let parsedDate;
+                if (dateStr.includes('/')) {
+                    // Handle MM/DD or MM/DD/YYYY format
+                    const parts = dateStr.split('/');
+                    if (parts.length === 2) {
+                        // MM/DD format - assume current year
+                        const year = new Date().getFullYear();
+                        parsedDate = new Date(year, parseInt(parts[0]) - 1, parseInt(parts[1]));
+                    } else if (parts.length === 3) {
+                        // MM/DD/YYYY format
+                        parsedDate = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                    }
+                } else {
+                    // Try direct parsing
+                    parsedDate = new Date(dateStr);
+                }
+                
+                if (!isNaN(parsedDate.getTime())) {
+                    dueDate = parsedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+                }
+            } catch (error) {
+                console.warn("Could not parse date:", dateStr, error);
+            }
+        }
+
+        // Parse points to number
+        let pointsNumber = null;
+        if (points && points !== 'N/A') {
+            const pointsMatch = points.toString().match(/\d+/);
+            if (pointsMatch) {
+                pointsNumber = parseInt(pointsMatch[0]);
+            }
+        }
+
+        const requestBody = {
+            parent: { database_id: databaseId },
+            properties: {
+                'Assignment Name': {
+                    title: [
+                        {
+                            type: 'text',
+                            text: { content: title }
+                        }
+                    ]
+                },
+                'Due Date': {
+                    date: dueDate ? { start: dueDate } : null
+                },
+                'Points': {
+                    number: pointsNumber
+                },
+                'Class Name': {
+                    select: { name: className }
+                },
+                'Done': {
+                    checkbox: false
+                },
+                'URL': {
+                    url: url || null
+                }
+            }
+        };
+
+        console.log("Request body for Notion API:", JSON.stringify(requestBody, null, 2));
+
         const response = await fetch('https://api.notion.com/v1/pages', {
             method: 'POST',
             headers: {
@@ -248,35 +341,11 @@ async function addAssignment(databaseId, assignment) {
                 'Notion-Version': '2022-06-28',
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                parent: { database_id: databaseId },
-                properties: {
-                    'Assignment Name': {
-                        title: [
-                            {
-                                type: 'text',
-                                text: { content: assignment.title || 'Untitled Assignment' }
-                            }
-                        ]
-                    },
-                    'Due Date': {
-                        date: assignment.dueDate ? { start: assignment.dueDate } : null
-                    },
-                    'Points': {
-                        number: assignment.points ? parseInt(assignment.points) : null
-                    },
-                    'Class Name': {
-                        select: { name: assignment.className || 'General' }
-                    },
-                    'Done': {
-                        checkbox: false
-                    },
-                    'URL': {
-                        url: assignment.url || null
-                    }
-                }
-            })
+            body: JSON.stringify(requestBody)
         });
+
+        console.log("Notion API response status:", response.status);
+        console.log("Notion API response headers:", Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
             const errorData = await response.json();
@@ -356,83 +425,195 @@ async function testNotionConnection() {
 
 // Add assignments to Google Calendar
 async function addToGoogleCalendar(assignments) {
+
     try {
-        console.log("Adding assignments to Google Calendar:", assignments);
-        
-        // Get Google Auth token
+
+        console.log("📤 Adding assignments to Google Calendar:", assignments);
+
+ 
+
+        // 🔐 Get Google Auth token
+
         const authResponse = await new Promise((resolve) => {
+
             chrome.identity.getAuthToken({ interactive: true }, (token) => {
+
                 if (chrome.runtime.lastError) {
+
                     resolve({ error: chrome.runtime.lastError.message });
+
                 } else {
+
                     resolve({ token });
+
                 }
+
             });
+
         });
 
+ 
+
         if (authResponse.error) {
+
             return { success: false, error: `Google Auth failed: ${authResponse.error}` };
+
         }
+
+ 
 
         const token = authResponse.token;
-        const calendarId = 'primary'; // Use primary calendar
-        
-        // Add each assignment as a calendar event
+
+        const calendarId = 'primary';
+
         const results = [];
+
+ 
+
         for (const assignment of assignments) {
+
             try {
+
                 const event = {
+
                     summary: `${assignment.className}: ${assignment.title}`,
+
                     description: `Assignment: ${assignment.title}\nPoints: ${assignment.points}\nURL: ${assignment.url || 'N/A'}`,
+
                     start: {
+
                         dateTime: assignment.dueDate ? new Date(assignment.dueDate).toISOString() : new Date().toISOString(),
+
                         timeZone: 'America/Chicago'
+
                     },
+
                     end: {
+
                         dateTime: assignment.dueDate ? new Date(new Date(assignment.dueDate).getTime() + 60 * 60 * 1000).toISOString() : new Date(new Date().getTime() + 60 * 60 * 1000).toISOString(),
+
                         timeZone: 'America/Chicago'
+
                     },
+
                     reminders: {
+
                         useDefault: false,
+
                         overrides: [
-                            { method: 'email', minutes: 24 * 60 }, // 1 day before
-                            { method: 'popup', minutes: 60 } // 1 hour before
+
+                            { method: 'email', minutes: 24 * 60 },
+
+                            { method: 'popup', minutes: 60 }
+
                         ]
+
                     }
+
                 };
 
+ 
+
                 const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`, {
+
                     method: 'POST',
+
                     headers: {
+
                         'Authorization': `Bearer ${token}`,
+
                         'Content-Type': 'application/json'
+
                     },
+
                     body: JSON.stringify(event)
+
                 });
 
+ 
+
                 if (response.ok) {
+
                     const result = await response.json();
+
                     results.push({ success: true, assignment: assignment.title, eventId: result.id });
+
                 } else {
+
                     const error = await response.json();
+
                     results.push({ success: false, assignment: assignment.title, error: error.error?.message || 'Unknown error' });
+
                 }
+
             } catch (error) {
+
                 results.push({ success: false, assignment: assignment.title, error: error.message });
+
             }
+
         }
 
+ 
+
         const successful = results.filter(r => r.success).length;
+
         const failed = results.filter(r => !r.success).length;
 
+ 
+
         return {
+
             success: successful > 0,
+
             message: `Added ${successful} assignments to Google Calendar${failed > 0 ? `, ${failed} failed` : ''}`,
+
             results: results
+
         };
 
+ 
+
     } catch (error) {
-        console.error("Error adding to Google Calendar:", error);
+
+        console.error("❌ Error adding to Google Calendar:", error);
+
         return { success: false, error: error.message };
+
     }
+
 }
+
+ 
+
+// ✅ Correctly REGISTER the message listener OUTSIDE the function
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+
+    if (message.type === 'ADD_TO_GOOGLE_CALENDAR') {
+
+        const cleanedAssignments = message.assignments.map(a => ({
+
+            title: a.assignment || "Untitled Assignment",
+
+            dueDate: a.due_date,
+
+            points: a.points || "100",
+
+            className: a.course || "General",
+
+            url: a.url || "https;;"
+
+        }));
+
+        addToGoogleCalendar(cleanedAssignments).then(response => {
+
+            sendResponse(response);
+
+        });
+
+        return true; // Required for async response
+
+    }
+
+});
