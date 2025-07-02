@@ -25,6 +25,9 @@ document.addEventListener("DOMContentLoaded", function () {
             if (confirmButton) {
                 confirmButton.remove();
             }
+            
+            // Add permanent course name input
+            addCourseNameInput();
         }
     });
 
@@ -116,53 +119,42 @@ document.addEventListener("DOMContentLoaded", function () {
             
             if (assignmentsInterface.style.display === 'none') {
                 console.log("Loading assignments...");
-                // First try to scrape assignments from the current page
-                try {
-                    const scrapedData = await scrapeAssignmentsFromPage();
-                    console.log("Scraped data:", scrapedData);
-                    if (scrapedData && scrapedData.length > 0) {
-                        scrapedAssignments = scrapedData;
-                        displayAssignments(scrapedData);
-                        assignmentsInterface.style.display = 'block';
-                        document.getElementById('viewAssignmentsBtn').textContent = 'Hide Deadlines';
-                        console.log("✅ Assignments interface is now visible");
-                        
-                        // Check if Google Calendar button is now accessible
-                        const calendarBtn = document.getElementById('addToCalendarBtn');
-                        if (calendarBtn) {
-                            console.log("✅ Google Calendar button is accessible after showing assignments");
-                        } else {
-                            console.error("❌ Google Calendar button still not found after showing assignments");
-                        }
+                
+                // Check if we have scraped assignments from the table button
+                if (window.scrapedAssignments && window.scrapedAssignments.length > 0) {
+                    console.log("Using scraped assignments:", window.scrapedAssignments);
+                    scrapedAssignments = window.scrapedAssignments;
+                    displayAssignments(window.scrapedAssignments);
+                    assignmentsInterface.style.display = 'block';
+                    document.getElementById('viewAssignmentsBtn').textContent = 'Hide Deadlines';
+                    console.log("✅ Assignments interface is now visible (from scraped data)");
+                    
+                    // Check if Google Calendar button is now accessible
+                    const calendarBtn = document.getElementById('addToCalendarBtn');
+                    if (calendarBtn) {
+                        console.log("✅ Google Calendar button is accessible after showing assignments");
                     } else {
-                        // Fallback to data.json if no scraped data
-                        console.log("No scraped data, trying data.json...");
-                        const response = await fetch(chrome.runtime.getURL('data.json'));
-                        const data = await response.json();
-                        console.log("Data.json result:", data);
-                        
-                        if (data && data.length > 0) {
-                            scrapedAssignments = data;
-                            displayAssignments(data);
+                        console.error("❌ Google Calendar button still not found after showing assignments");
+                    }
+                } else {
+                    // Fallback to scraping from current page
+                    try {
+                        const scrapedData = await scrapeAssignmentsFromPage();
+                        console.log("Scraped data from page:", scrapedData);
+                        if (scrapedData && scrapedData.length > 0) {
+                            scrapedAssignments = scrapedData;
+                            displayAssignments(scrapedData);
                             assignmentsInterface.style.display = 'block';
                             document.getElementById('viewAssignmentsBtn').textContent = 'Hide Deadlines';
-                            console.log("✅ Assignments interface is now visible (from data.json)");
-                            
-                            // Check if Google Calendar button is now accessible
-                            const calendarBtn = document.getElementById('addToCalendarBtn');
-                            if (calendarBtn) {
-                                console.log("✅ Google Calendar button is accessible after showing assignments (from data.json)");
-                            } else {
-                                console.error("❌ Google Calendar button still not found after showing assignments (from data.json)");
-                            }
+                            console.log("✅ Assignments interface is now visible (from page scraping)");
                         } else {
                             showMessage('No assignments found. Try using the Table button on a course page first.', 'error');
-                            console.log("❌ No assignments found in data.json either");
+                            console.log("❌ No assignments found from page scraping");
                         }
+                    } catch (error) {
+                        console.error("Error loading assignments:", error);
+                        showMessage('Error loading assignments', 'error');
                     }
-                } catch (error) {
-                    console.error("Error loading assignments:", error);
-                    showMessage('Error loading assignments', 'error');
                 }
             } else {
                 // Hide interface
@@ -238,8 +230,8 @@ document.addEventListener("DOMContentLoaded", function () {
             const checkboxes = document.querySelectorAll('#assignmentsList input[type="checkbox"]:checked');
             if (checkboxes.length === 0) {
                 showMessage('Please select at least one assignment', 'error');
-                return;
-            }
+            return;
+        }
 
             const selectedAssignments = [];
             checkboxes.forEach(checkbox => {
@@ -401,36 +393,212 @@ document.addEventListener("DOMContentLoaded", function () {
         }, 3000);
     }
 
+    // Function to add permanent course name input
+    function addCourseNameInput() {
+        const courseInputContainer = document.createElement('div');
+        courseInputContainer.style.cssText = `
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            border: 2px solid #8b48bc;
+        `;
+        
+        courseInputContainer.innerHTML = `
+            <label for="courseNameInput" style="display: block; margin-bottom: 5px; font-family: 'MyFont', sans-serif; font-weight: bold; color: #333;">Course Name:</label>
+            <input type="text" id="courseNameInput" placeholder="Enter course name (e.g., CS 101)" style="width: 100%; padding: 8px; border: 2px solid #8b48bc; border-radius: 4px; font-family: 'MyFont', sans-serif; font-size: 14px; box-sizing: border-box;">
+        `;
+        
+        // Insert the course input before the website display
+        const websiteDisplay = document.getElementById("websiteDisplay");
+        websiteDisplay.parentNode.insertBefore(courseInputContainer, websiteDisplay);
+    }
+
     // Table button functionality - scrape assignments
     if (tableButton) {
         tableButton.addEventListener("click", async () => {
-            if (!currentUrl) {
-                alert("Could not retrieve the current website.");
+        if (!currentUrl) {
+            alert("Could not retrieve the current website.");
+            return;
+        }
+            
+            // Check if course name is entered
+            const courseNameInput = document.getElementById('courseNameInput');
+            if (!courseNameInput || !courseNameInput.value.trim()) {
+                showMessage('Please enter a course name first', 'error');
                 return;
             }
             
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+            chrome.scripting.executeScript(
+                {
+                    target: { tabId: tabs[0].id },
+                    func: () => {
+                        function getColumnIndex(headers, keywords) {
+                            for (let i = 0; i < headers.length; i++) {
+                                const header = headers[i].toLowerCase();
+                                for (const keyword of keywords) {
+                                    if (header.includes(keyword)) return i;
+                                }
+                            }
+                            return -1;
+                        }
+                        function looksLikeAnyDate(str) {
+                            if (!str) return false;
+                            str = str.trim().toLowerCase();
+                            // Match month names, MM/DD, MM/DD/YYYY, YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, etc.
+                            return /(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*|\b\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b|\b\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2}:\d{2})?\b/.test(str);
+                        }
+                        return Array.from(document.querySelectorAll('table')).map(table => {
+                            const rows = Array.from(table.rows).map(row =>
+                                Array.from(row.cells).map(cell => cell.innerText.trim())
+                            );
+                            if (rows.length < 2) return null;
+                            const headers = rows[0];
+                            const courseIdx = getColumnIndex(headers, ['course', 'class', 'section']);
+                                const assignmentIdx = getColumnIndex(headers, ['assignment', 'name', 'title', 'problem', 'exam', 'details', 'lab', 'machine problem']);
+                            const dueIdx = getColumnIndex(headers, ['due', 'date', 'deadline', 'submission']);
+                            return rows.slice(1).map(row => {
+                                let due_date = dueIdx !== -1 && row[dueIdx] ? row[dueIdx] : '';
+                                if (!due_date) {
+                                    // Scan all cells for a date-like value
+                                    for (const cell of row) {
+                                        if (looksLikeAnyDate(cell)) {
+                                            due_date = cell;
+                                            break;
+                                        }
+                                    }
+                                }
+                                return {
+                                    course: courseIdx !== -1 && row[courseIdx] ? row[courseIdx] : '',
+                                    assignment: assignmentIdx !== -1 && row[assignmentIdx] ? row[assignmentIdx] : '',
+                                    due_date: due_date
+                                };
+                            });
+                        }).filter(Boolean).flat();
+                    }
+                },
+                (results) => {
+                    const items = results && results[0] && results[0].result;
+                    if (items && items.length) {
+                            const courseName = courseNameInput.value.trim();
+                            
+                            // Update all items with the entered course name
+                            const updatedItems = items.map(item => ({
+                                ...item,
+                                course: courseName
+                            }));
+                            
+                            // Store the assignments for use with Google Calendar and Notion
+                            window.scrapedAssignments = updatedItems;
+                            
+                            // Also store in Chrome storage for content script access
+                            chrome.storage.local.set({ 'scrapedAssignments': updatedItems }, () => {
+                                console.log('Scraped assignments stored in Chrome storage');
+                            });
+                            
+                            // Send the scraped data directly to the content script
+                            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                                chrome.tabs.sendMessage(tabs[0].id, {
+                                    type: 'SCRAPED_ASSIGNMENTS_READY',
+                                    assignments: updatedItems
+                                }, (response) => {
+                                    if (chrome.runtime.lastError) {
+                                        console.log('Content script not ready yet:', chrome.runtime.lastError);
+                                    } else {
+                                        console.log('Scraped assignments sent to content script');
+                                    }
+                                });
+                            });
+                            
+                            // Show success message and integration options
+                            showMessage(`Successfully scraped ${items.length} assignments for ${courseName}!`, 'success');
+                            
+                            // Create integration buttons
+                            createIntegrationButtons(updatedItems);
+                    } else {
+                            showMessage("No tables with the required columns found on the page.", 'error');
+                        }
+                }
+            );
+        });
+    });
+    }
+
+    // Function to create integration buttons for scraped assignments
+    function createIntegrationButtons(assignments) {
+        // Remove any existing integration buttons
+        const existingButtons = document.querySelectorAll('.integration-button');
+        existingButtons.forEach(btn => btn.remove());
+        
+        // Create container for integration buttons
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = `
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            border: 2px solid #8b48bc;
+            text-align: center;
+        `;
+        
+        buttonContainer.innerHTML = `
+            <h4 style="margin: 0 0 15px 0; color: #333; font-family: 'MyFont', serif;">Add Scraped Assignments To:</h4>
+            <button id="addToCalendarBtn" class="integration-button" style="font-family: 'MyFont', monospace; font-size: 14px; background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; width: 100%; transition: background-color 0.3s ease;">Add to Google Calendar</button>
+        `;
+        
+        // Insert the button container after the website input section
+        const websiteInput = document.querySelector('.website-input');
+        if (websiteInput) {
+            websiteInput.parentNode.insertBefore(buttonContainer, websiteInput.nextSibling);
+        }
+        
+        // Add event listener for the Google Calendar button
+        document.getElementById('addToCalendarBtn').addEventListener('click', async () => {
+            showMessage(`Adding ${assignments.length} assignments to Google Calendar...`, 'info');
+            
             try {
-                const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-                const currentTab = tabs[0];
-                
-                const response = await chrome.tabs.sendMessage(currentTab.id, {
-                    type: 'SCRAPE_TABLE_DATA'
+                const response = await chrome.runtime.sendMessage({
+                    type: 'ADD_TO_GOOGLE_CALENDAR',
+                    assignments: assignments
                 });
                 
                 if (response && response.success) {
-                    scrapedAssignments = response.assignments || [];
-                    showMessage(`Scraped ${scrapedAssignments.length} assignments!`, 'success');
-                    
-                    // Store the scraped data for use in Notion interface
-                    chrome.storage.local.set({ scrapedAssignments: scrapedAssignments });
+                    showMessage(`Successfully added ${assignments.length} assignments to Google Calendar!`, 'success');
                 } else {
-                    showMessage('No table data found or scraping failed', 'error');
+                    showMessage(`Failed to add to calendar: ${response?.error || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
-                console.error("Error scraping table data:", error);
-                showMessage('Error scraping table data', 'error');
+                console.error("Error adding to Google Calendar:", error);
+                showMessage('Error adding to Google Calendar. Please check console for details.', 'error');
             }
         });
+    }
+
+    // Function to save JSON data to assignments.json
+    function downloadJSON(data) {
+        // Save to Chrome storage for persistence
+        chrome.storage.local.set({ 'assignments.json': data }, () => {
+            if (chrome.runtime.lastError) {
+                console.error('Error saving to storage:', chrome.runtime.lastError);
+                showMessage('Error saving assignments data', 'error');
+            } else {
+                showMessage('Assignments saved to assignments.json successfully!', 'success');
+                console.log('Assignments saved:', data);
+            }
+        });
+        
+        // Also create a downloadable file as backup
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'assignments.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     // Background color cycle logic

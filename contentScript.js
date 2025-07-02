@@ -331,6 +331,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             sendResponse(result);
         });
         return true;
+    } else if (message.type === 'SCRAPED_ASSIGNMENTS_READY') {
+        console.log('Received scraped assignments:', message.assignments);
+        // The assignments array is now available in your content script
+        // message.assignments contains: [{course, assignment, due_date}, ...]
+        
+        // You can now use this data in your content script
+        // For example, you could:
+        // - Display it on the page
+        // - Process it further
+        // - Send it to other parts of your extension
+        
+        sendResponse({ success: true });
     } else {
         console.error("Unknown message type:", message.type);
         sendResponse({ success: false, error: "Unknown message type" });
