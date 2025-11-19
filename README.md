@@ -1,4 +1,4 @@
-# UIRP_Research_Hackathon
+# UIRP_Research_Hackathon - Unition
 
 # Description
 
